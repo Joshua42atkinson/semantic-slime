@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  lint:
+    name: Lint & Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rokit
+        uses: Roblox/setup-rokit@v1
+        
+      - name: Run Selene Linter
+        run: selene src/
+        
+      - name: Check Formatting (StyLua)
+        run: stylua --check src/
+
+  build:
+    name: Build Game
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rokit
+        uses: Roblox/setup-rokit@v1
+        
+      - name: Install Dependencies
+        run: wally install
+        
+      - name: Build with Rojo
+        run: rojo build default.project.json -o semantic_slime.rbxl
+        
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: game-build
+          path: semantic_slime.rbxl
+          retention-days: 7
+
+  # Optional: Deploy to Roblox (requires Roblox Open Cloud setup)
+  # deploy:
+  #   name: Deploy to Roblox
+  #   runs-on: ubuntu-latest
+  #   needs: build
+  #   if: github.ref == 'refs/heads/main'
+  #   steps:
+  #     - name: Download Build
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: game-build
+  #         
+  #     - name: Deploy to Roblox
+  #       run: |
+  #         # Add Roblox Open Cloud deployment here
+  #         echo "Deploy to Roblox Place ID: ${{ secrets.ROBLOX_PLACE_ID }}"

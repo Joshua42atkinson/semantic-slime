@@ -1,0 +1,16 @@
+[Unit]
+Description=Rojo Sync Server for AI Academy Roblox Project
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/roblox
+Environment="PATH=%h/.rokit/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=%h/.rokit/bin/rojo serve
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
