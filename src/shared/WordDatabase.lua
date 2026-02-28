@@ -14,6 +14,8 @@ local WordDatabase = {
 		V = 5.0, 
 		A = 2.0, 
 		D = 6.0 
+	,
+		GradeLevel = "3-5"
 	},
 	["idea"] = { 
 		C = 1.45, 
@@ -21,6 +23,8 @@ local WordDatabase = {
 		V = 6.5, 
 		A = 4.0, 
 		D = 5.0 
+	,
+		GradeLevel = "6-8"
 	},
 	["inferno"] = { 
 		C = 4.5, 
@@ -28,6 +32,8 @@ local WordDatabase = {
 		V = 2.1, 
 		A = 7.8, 
 		D = 8.0 
+	,
+		GradeLevel = "6-8"
 	},
 	["tranquility"] = { 
 		C = 1.8, 
@@ -35,6 +41,8 @@ local WordDatabase = {
 		V = 8.5, 
 		A = 1.2, 
 		D = 6.0 
+	,
+		GradeLevel = "6-8"
 	},
 	["shadow"] = { 
 		C = 3.5, 
@@ -42,6 +50,8 @@ local WordDatabase = {
 		V = 3.0, 
 		A = 4.5, 
 		D = 4.0 
+	,
+		GradeLevel = "3-5"
 	},
 }
 

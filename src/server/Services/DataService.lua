@@ -56,7 +56,9 @@ local DEFAULT_DATA = {
     Slimes = {}, -- { [InstanceId]: SlimeInstance }
     LetterInventory = {}, -- { [Letter]: Count }
     Quests = {}, -- { [QuestId]: QuestState }
+    NPCProgress = {}, -- { [NPCId]: number }
     Journal = {}, -- { [Timestamp]: {Entry="Text", Type="Reflection"} }
+    Achievements = {}, -- { [AchievementId]: number } (stores progress, if >= Requirement it is unlocked)
     GamePasses = {}, -- { [PassId]: boolean }
     GachaCollection = {}, -- { [InstanceId]: ImaginarySlime }
     Settings = {
@@ -158,6 +160,20 @@ function DataService:_LoadData(player: Player)
     self.Client.DataLoaded:Fire(player, sessionData[player])
 end
 
+function DataService.Client:GetProfile(player: Player)
+    return self.Server:GetProfile(player)
+end
+
+function DataService.Client:CompleteTutorial(player: Player)
+    local profile = self.Server:GetProfile(player)
+    if profile then
+        profile.TutorialCompleted = true
+        self.Server:UnlockAchievement(player, "complete_tutorial")
+        return true
+    end
+    return false
+end
+
 -- Internal Save
 function DataService:_SaveData(player: Player)
     local data = sessionData[player]
@@ -219,6 +235,33 @@ function DataService:GetJournal(player: Player)
         return profile.Journal
     end
     return {}
+end
+
+-- Achievements system
+function DataService:IncrementAchievementProgress(player: Player, achievementId: string, amount: number)
+    local profile = self:GetProfile(player)
+    if profile then
+        if not profile.Achievements then profile.Achievements = {} end
+        
+        local current = profile.Achievements[achievementId] or 0
+        local AchievementData = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("AchievementData"))
+        local data = AchievementData[achievementId]
+        
+        if data and current < data.Requirement then
+            profile.Achievements[achievementId] = current + amount
+            if profile.Achievements[achievementId] >= data.Requirement then
+                profile.Achievements[achievementId] = data.Requirement
+                -- Replicate achievement unlock
+                self.Client.DataUpdated:Fire(player, "AchievementUnlocked", achievementId)
+                print("[DataService] " .. player.Name .. " unlocked achievement: " .. data.Name)
+            end
+            self.Client.DataUpdated:Fire(player, "Achievements", profile.Achievements)
+        end
+    end
+end
+
+function DataService:UnlockAchievement(player: Player, achievementId: string)
+    self:IncrementAchievementProgress(player, achievementId, 1)
 end
 
 return DataService

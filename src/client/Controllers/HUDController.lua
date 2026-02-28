@@ -16,6 +16,9 @@ local BattleUI = require(script.Parent.Parent.UI.BattleUI)
 local SlimeCollectionUI = require(script.Parent.Parent.UI.SlimeCollectionUI)
 local DialogueUI = require(script.Parent.Parent.UI.DialogueUI)
 local LureUI = require(script.Parent.Parent.UI.LureUI)
+local TutorialUI = require(script.Parent.Parent.UI.TutorialUI)
+local InventoryUI = require(script.Parent.Parent.UI.InventoryUI)
+local AchievementUI = require(script.Parent.Parent.UI.AchievementUI)
 
 -- State
 local playerStats = {
@@ -38,6 +41,15 @@ function HUDController:KnitStart()
 	-- Initialize Slime Collection UI
 	SlimeCollectionUI.Initialize()
 	
+	-- Initialize Tutorial UI (for new players)
+	TutorialUI.Initialize()
+	
+	-- Initialize Inventory UI
+	InventoryUI.Initialize()
+	
+	-- Initialize Achievement UI
+	AchievementUI.Initialize()
+	
 	print("[HUDController] Started successfully.")
 end
 
@@ -51,10 +63,9 @@ function HUDController:CreateMainHUD()
 	screenGui.IgnoreGuiInset = true
 	screenGui.Parent = playerGui
 	
-	-- Top-left: Player Stats
-	self:CreatePlayerStatsPanel(screenGui)
+	-- Top-center: Phase indicator
+	self:CreatePhasePanel(screenGui)
 	
-	-- Top-center: Phase indicator (handled by GameLoopController)
 	-- Right side: Quest Log (handled by QuestLog)
 	
 	-- Bottom: Action Bar
@@ -62,6 +73,9 @@ function HUDController:CreateMainHUD()
 	
 	-- Bottom-right: Mini-map placeholder
 	self:CreateMiniMap(screenGui)
+	
+	-- Full-screen Phase Splash
+	self:CreatePhaseSplash(screenGui)
 end
 
 function HUDController:CreatePlayerStatsPanel(parent: Instance)
@@ -158,8 +172,44 @@ function HUDController:CreatePlayerStatsPanel(parent: Instance)
 	self.nameLabel.Font = Enum.Font.Gotham
 	self.nameLabel.TextSize = 12
 	self.nameLabel.Text = Players.LocalPlayer.Name
-	self.nameLabel.TextXAlignment = Enum.TextXAlignment.Left
 	self.nameLabel.Parent = statsPanel
+end
+
+function HUDController:CreatePhasePanel(parent: Instance)
+	local phaseFrame = Instance.new("Frame")
+	phaseFrame.Name = "PhasePanel"
+	phaseFrame.Size = UDim2.fromOffset(300, 60)
+	phaseFrame.Position = UDim2.fromScale(0.5, 0.05)
+	phaseFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+	phaseFrame.BackgroundColor3 = GameConfig.Colors.Dark
+	phaseFrame.BackgroundTransparency = 0.3
+	phaseFrame.Parent = parent
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 10)
+	corner.Parent = phaseFrame
+
+	self.phaseLabel = Instance.new("TextLabel")
+	self.phaseLabel.Name = "PhaseLabel"
+	self.phaseLabel.Size = UDim2.fromScale(1, 0.6)
+	self.phaseLabel.BackgroundTransparency = 1
+	self.phaseLabel.TextColor3 = Color3.new(1, 1, 1)
+	self.phaseLabel.Font = Enum.Font.GothamBold
+	self.phaseLabel.TextSize = 22
+	self.phaseLabel.Text = "Waiting..."
+	self.phaseLabel.Parent = phaseFrame
+
+	self.timerLabel = Instance.new("TextLabel")
+	self.timerLabel.Name = "TimerLabel"
+	self.timerLabel.Size = UDim2.fromScale(1, 0.4)
+	self.timerLabel.Position = UDim2.fromScale(0, 0.6)
+	self.timerLabel.BackgroundTransparency = 1
+	self.timerLabel.TextColor3 = GameConfig.Colors.TextDim
+	self.timerLabel.Font = Enum.Font.Gotham
+	self.timerLabel.TextSize = 16
+	self.timerLabel.Text = ""
+	self.timerLabel.Visible = false
+	self.timerLabel.Parent = phaseFrame
 end
 
 function HUDController:CreateActionBar(parent: Instance)
@@ -180,7 +230,7 @@ function HUDController:CreateActionBar(parent: Instance)
 	local actions = {
 		{ Name = "Collection", Key = "I", Icon = "🧪", Callback = function() SlimeCollectionUI.Toggle() end },
 		{ Name = "Quests", Key = "J", Icon = "📜", Callback = function() self:ToggleQuestLog() end },
-		{ Name = "Shop", Key = "P", Icon = "🛒", Callback = function() self:OpenShop() end },
+		{ Name = "Achievements", Key = "Y", Icon = "🏆", Callback = function() AchievementUI.Toggle() end },
 		{ Name = "Settings", Key = "Esc", Icon = "⚙️", Callback = function() self:OpenSettings() end },
 	}
 	
@@ -243,15 +293,15 @@ function HUDController:CreateMiniMap(parent: Instance)
 	mapTitle.TextColor3 = GameConfig.Colors.TextDim
 	mapTitle.Font = Enum.Font.GothamBold
 	mapTitle.TextSize = 10
-	mapTitle.Text = "Psyche-Polis"
+	mapTitle.Text = "Syllable Springs"
 	mapTitle.Parent = miniMap
 	
 	-- District indicators
 	local districts = {
-		{ Name = "Logos", Position = UDim2.fromScale(0.5, 0.25), Color = Color3.fromHex("#3B82F6") },
-		{ Name = "Eros", Position = UDim2.fromScale(0.5, 0.75), Color = Color3.fromHex("#22C55E") },
-		{ Name = "Pneuma", Position = UDim2.fromScale(0.8, 0.5), Color = Color3.fromHex("#8B5CF6") },
-		{ Name = "Soma", Position = UDim2.fromScale(0.2, 0.5), Color = Color3.fromHex("#EF4444") },
+		{ Name = "BrainyBorough", Position = UDim2.fromScale(0.5, 0.25), Color = Color3.fromHex("#3B82F6") },
+		{ Name = "HeartwoodGrove", Position = UDim2.fromScale(0.5, 0.75), Color = Color3.fromHex("#22C55E") },
+		{ Name = "WhisperWinds", Position = UDim2.fromScale(0.8, 0.5), Color = Color3.fromHex("#8B5CF6") },
+		{ Name = "ActionAlley", Position = UDim2.fromScale(0.2, 0.5), Color = Color3.fromHex("#EF4444") },
 	}
 	
 	for _, district in ipairs(districts) do
@@ -281,6 +331,37 @@ function HUDController:CreateMiniMap(parent: Instance)
 	playerCorner.Parent = playerIndicator
 end
 
+function HUDController:CreatePhaseSplash(parent: Instance)
+	self.splashFrame = Instance.new("Frame")
+	self.splashFrame.Name = "PhaseSplash"
+	self.splashFrame.Size = UDim2.fromScale(1, 0.2)
+	self.splashFrame.Position = UDim2.fromScale(0.5, 0.5)
+	self.splashFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+	self.splashFrame.BackgroundColor3 = GameConfig.Colors.Primary
+	self.splashFrame.BackgroundTransparency = 1
+	self.splashFrame.BorderSizePixel = 0
+	self.splashFrame.Parent = parent
+
+	local gradient = Instance.new("UIGradient")
+	gradient.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(0.5, 0),
+		NumberSequenceKeypoint.new(1, 1)
+	})
+	gradient.Parent = self.splashFrame
+
+	self.splashLabel = Instance.new("TextLabel")
+	self.splashLabel.Name = "SplashLabel"
+	self.splashLabel.Size = UDim2.fromScale(1, 1)
+	self.splashLabel.BackgroundTransparency = 1
+	self.splashLabel.TextColor3 = Color3.new(1, 1, 1)
+	self.splashLabel.TextTransparency = 1
+	self.splashLabel.Font = Enum.Font.GothamBold
+	self.splashLabel.TextSize = 60
+	self.splashLabel.Text = "PHASE START"
+	self.splashLabel.Parent = self.splashFrame
+end
+
 function HUDController:InitializeServiceConnections()
 	-- Connect to DataService for stats updates
 	local DataService = Knit.GetService("DataService")
@@ -292,6 +373,12 @@ function HUDController:InitializeServiceConnections()
 	DataService.Client.DataUpdated:Connect(function(key, value)
 		if key == "Stats" or key == "Level" or key == "XP" then
 			self:UpdateStats(value)
+		elseif key == "AchievementUnlocked" then
+			local AchievementData = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("AchievementData"))
+			local data = AchievementData[value]
+			if data then
+				self:ShowAchievementPopup(data)
+			end
 		end
 	end)
 	
@@ -346,6 +433,8 @@ function HUDController:SetupKeyboardShortcuts()
 		-- J = Quest Log
 		elseif input.KeyCode == Enum.KeyCode.J then
 			self:ToggleQuestLog()
+		elseif input.KeyCode == Enum.KeyCode.B then
+			InventoryUI.Toggle()
 		-- K = Word Constructor (during Construction phase)
 		elseif input.KeyCode == Enum.KeyCode.K then
 			local WordConstructorController = Knit.GetController("WordConstructorController")
@@ -376,16 +465,84 @@ function HUDController:UpdateStats(data: any)
 end
 
 function HUDController:OnPhaseChanged(phase: string, duration: number)
-	-- Show phase notification
 	local phaseNames = {
-		Collection = "🌟 Collection Phase - Collect letter crystals!",
-		Construction = "🔨 Construction Phase - Build words!",
-		Quest = "📜 Quest Phase - Complete Mad Libs!",
-		Combat = "⚔️ Combat Phase - Battle for slots!",
-		Rewards = "🎁 Rewards Phase - Claim your rewards!",
+		Collection = "The World Breathes in Letters",
+		Construction = "Crystallizing Meaning",
+		Quest = "Manifesting the Hero's Journey",
+		Combat = "Discord in the Psyche",
+		Rewards = "Resonance of Achievement",
 	}
 	
-	self:ShowNotification(phaseNames[phase] or phase .. " Phase", 3)
+	self:ShowNotification(phaseNames[phase] or phase, 3)
+	
+	if self.phaseLabel then
+		self.phaseLabel.Text = phaseNames[phase] or phase
+	end
+	
+	if self.timerLabel then
+		self.timerLabel.Visible = false
+	end
+	
+	self:PlayPhaseSplash(phaseNames[phase] or phase)
+end
+
+function HUDController:PlayPhaseSplash(text: string)
+	if not self.splashFrame or not self.splashLabel then return end
+	
+	self.splashLabel.Text = text:upper()
+	
+	-- Reset state
+	self.splashFrame.BackgroundTransparency = 1
+	self.splashLabel.TextTransparency = 1
+	self.splashFrame.Size = UDim2.fromScale(1, 0)
+	
+	-- Play Sound (SoundController handles its own signals, but we can call it if needed)
+	local SoundController = Knit.GetController("SoundController")
+	if SoundController then
+		SoundController:Play("LevelUp") -- Reusing for impact
+	end
+
+	-- Animation sequence
+	local info = TweenInfo.new(0.6, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+	
+	TweenService:Create(self.splashFrame, info, {
+		BackgroundTransparency = 0.5,
+		Size = UDim2.fromScale(1, 0.2)
+	}):Play()
+	
+	TweenService:Create(self.splashLabel, info, {
+		TextTransparency = 0
+	}):Play()
+	
+	task.delay(2.5, function()
+		local fadeInfo = TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		TweenService:Create(self.splashFrame, fadeInfo, {
+			BackgroundTransparency = 1,
+			Size = UDim2.fromScale(1, 0)
+		}):Play()
+		
+		TweenService:Create(self.splashLabel, fadeInfo, {
+			TextTransparency = 1
+		}):Play()
+	end)
+end
+
+function HUDController:UpdateTimer(timeLeft: number)
+	if not self.timerLabel then return end
+	
+	if timeLeft <= 10 and timeLeft > 0 then
+		self.timerLabel.Visible = true
+		self.timerLabel.Text = "The Phase Fades in " .. tostring(timeLeft) .. "s"
+		
+		-- Subtle pulse effect
+		if timeLeft % 2 == 0 then
+			self.timerLabel.TextColor3 = GameConfig.Colors.Accent
+		else
+			self.timerLabel.TextColor3 = GameConfig.Colors.TextDim
+		end
+	else
+		self.timerLabel.Visible = false
+	end
 end
 
 function HUDController:OnGameEvent(eventType: string, data: any)
@@ -393,6 +550,76 @@ function HUDController:OnGameEvent(eventType: string, data: any)
 		self:ShowNotification("🧪 Created: " .. tostring(data), 3)
 	elseif eventType == "QuestCompleted" then
 		self:ShowNotification("🎉 Quest Complete: " .. tostring(data), 4)
+	elseif eventType == "ObjectiveComplete" then
+		self:ShowNotification("🎯 Objective Complete: " .. tostring(data.Bonus), 4)
+		self:UpdateObjectiveUI(data)
+	end
+end
+
+-- Create/update objective progress UI
+function HUDController:UpdateObjectiveUI(objectiveData: any)
+	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+	
+	-- Find or create objective panel
+	local objectivePanel = playerGui:FindFirstChild("ObjectivePanel")
+	if not objectivePanel then
+		objectivePanel = Instance.new("Frame")
+		objectivePanel.Name = "ObjectivePanel"
+		objectivePanel.Size = UDim2.fromOffset(250, 80)
+		objectivePanel.Position = UDim2.fromScale(0.5, 0.15)
+		objectivePanel.AnchorPoint = Vector2.new(0.5, 0)
+		objectivePanel.BackgroundColor3 = GameConfig.Colors.Primary
+		objectivePanel.BackgroundTransparency = 0.3
+		objectivePanel.Parent = playerGui
+		
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0, 10)
+		corner.Parent = objectivePanel
+		
+		local stroke = Instance.new("UIStroke")
+		stroke.Color = GameConfig.Colors.Accent
+		stroke.Thickness = 2
+		stroke.Parent = objectivePanel
+		
+		-- Title
+		local titleLabel = Instance.new("TextLabel")
+		titleLabel.Name = "TitleLabel"
+		titleLabel.Size = UDim2.fromScale(1, 0.4)
+		titleLabel.BackgroundTransparency = 1
+		titleLabel.TextColor3 = Color3.new(1, 1, 1)
+		titleLabel.Font = Enum.Font.GothamBold
+		titleLabel.TextSize = 14
+		titleLabel.Text = "🎯 Phase Objective"
+		titleLabel.Parent = objectivePanel
+		
+		-- Progress bar
+		local progressBg = Instance.new("Frame")
+		progressBg.Name = "ProgressBg"
+		progressBg.Size = UDim2.fromScale(0.9, 0.25)
+		progressBg.Position = UDim2.fromScale(0.05, 0.45)
+		progressBg.BackgroundColor3 = Color3.fromHex("#1F2937")
+		progressBg.Parent = objectivePanel
+		
+		local progressCorner = Instance.new("UICorner")
+		progressCorner.CornerRadius = UDim.new(0, 4)
+		progressCorner.Parent = progressBg
+		
+		-- Bonus label
+		local bonusLabel = Instance.new("TextLabel")
+		bonusLabel.Name = "BonusLabel"
+		bonusLabel.Size = UDim2.fromScale(1, 0.3)
+		bonusLabel.Position = UDim2.fromScale(0, 0.7)
+		bonusLabel.BackgroundTransparency = 1
+		bonusLabel.TextColor3 = GameConfig.Colors.Accent
+		bonusLabel.Font = Enum.Font.GothamBold
+		bonusLabel.TextSize = 12
+		bonusLabel.Parent = objectivePanel
+	end
+	
+	-- Update with new objective data
+	local bonusLabel = objectivePanel:FindFirstChild("BonusLabel")
+	if bonusLabel and objectiveData then
+		bonusLabel.Text = "✓ " .. objectiveData.Bonus .. " COMPLETED!"
 	end
 end
 
@@ -445,6 +672,88 @@ function HUDController:ShowNotification(text: string, duration: number)
 		
 		task.wait(0.4)
 		notification:Destroy()
+	end)
+end
+
+function HUDController:ShowAchievementPopup(data: any)
+	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+	
+	local container = playerGui:FindFirstChild("AchievementContainer")
+	if not container then
+		container = Instance.new("ScreenGui")
+		container.Name = "AchievementContainer"
+		container.ResetOnSpawn = false
+		container.Parent = playerGui
+	end
+	
+	local popup = Instance.new("Frame")
+	popup.Size = UDim2.fromOffset(300, 80)
+	popup.Position = UDim2.fromScale(0.5, 0.8)
+	popup.AnchorPoint = Vector2.new(0.5, 0)
+	popup.BackgroundColor3 = Color3.fromHex("#FFD700") -- Gold
+	popup.BackgroundTransparency = 0.1
+	popup.Parent = container
+	
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 12)
+	corner.Parent = popup
+	
+	local uiStroke = Instance.new("UIStroke")
+	uiStroke.Color = Color3.new(1, 1, 1)
+	uiStroke.Thickness = 2
+	uiStroke.Parent = popup
+	
+	local iconLabel = Instance.new("TextLabel")
+	iconLabel.Size = UDim2.fromOffset(60, 60)
+	iconLabel.Position = UDim2.fromOffset(10, 10)
+	iconLabel.BackgroundTransparency = 1
+	iconLabel.Text = data.Icon or "🏆"
+	iconLabel.TextSize = 40
+	iconLabel.Parent = popup
+	
+	local titleLabel = Instance.new("TextLabel")
+	titleLabel.Size = UDim2.fromScale(1, 0.4)
+	titleLabel.Position = UDim2.fromOffset(80, 10)
+	titleLabel.BackgroundTransparency = 1
+	titleLabel.TextColor3 = Color3.new(0, 0, 0)
+	titleLabel.Font = Enum.Font.GothamBold
+	titleLabel.TextSize = 16
+	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+	titleLabel.Text = "Achievement Unlocked!"
+	titleLabel.Parent = popup
+	
+	local nameLabel = Instance.new("TextLabel")
+	nameLabel.Size = UDim2.fromScale(1, 0.6)
+	nameLabel.Position = UDim2.fromOffset(80, 35)
+	nameLabel.BackgroundTransparency = 1
+	nameLabel.TextColor3 = Color3.fromRGB(50, 50, 50)
+	nameLabel.Font = Enum.Font.Gotham
+	nameLabel.TextSize = 14
+	nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+	nameLabel.Text = data.Name
+	nameLabel.TextWrapped = true
+	nameLabel.Parent = popup
+	
+	-- Play sound
+	local SoundController = Knit.GetController("SoundController")
+	if SoundController then
+		SoundController:Play("Victory")
+	end
+	
+	-- Animate in
+	popup.Position = UDim2.fromScale(0.5, 1.2)
+	TweenService:Create(popup, TweenInfo.new(0.6, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out), {
+		Position = UDim2.fromScale(0.5, 0.85)
+	}):Play()
+	
+	-- Remove after 5 seconds
+	task.delay(5, function()
+		TweenService:Create(popup, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+			Position = UDim2.fromScale(0.5, 1.2)
+		}):Play()
+		
+		task.wait(0.5)
+		popup:Destroy()
 	end)
 end
 

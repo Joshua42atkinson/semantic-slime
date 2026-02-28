@@ -14,6 +14,7 @@ local SlimeFactory = Knit.CreateService {
 	Client = {
 		SlimeCreated = Knit.CreateSignal(),
 		SlimeEvolved = Knit.CreateSignal(),
+		CompanionChanged = Knit.CreateSignal(),
 	},
 }
 
@@ -319,6 +320,15 @@ local function applyRarityMultiplier(stats: { [string]: number }, rarity: string
 	return newStats
 end
 
+function SlimeFactory.Client:GetPlayerSlimes(player: Player)
+	return self.Server:GetPlayerSlimes(player)
+end
+
+function SlimeFactory.Client:SetCompanion(player: Player, instanceId: string)
+	if type(instanceId) ~= "string" then return false end
+	return self.Server:SetCompanion(player, instanceId)
+end
+
 function SlimeFactory:KnitStart()
 	print("[SlimeFactory] Started.")
 end
@@ -377,6 +387,23 @@ function SlimeFactory:CreateSlime(player: Player, word: string): SlimeInstance?
 	-- Notify client
 	self.Client.SlimeCreated:Fire(player, slime)
 	print("[SlimeFactory] Created slime: " .. slime.Term .. " (" .. slime.Rarity .. " " .. slime.Role .. ")")
+	
+	-- Achievements
+	local DataService = Knit.GetService("DataService")
+	if DataService then
+		DataService:UnlockAchievement(player, "first_slime")
+		DataService:IncrementAchievementProgress(player, "slime_collector_10", 1)
+		DataService:IncrementAchievementProgress(player, "slime_collector_50", 1)
+		
+		-- Element masters
+		local elementMap = {
+			Fire = "fire_master", Water = "water_master", Earth = "earth_master",
+			Air = "air_master", Shadow = "shadow_master", Light = "light_master"
+		}
+		if elementMap[slime.Element] then
+			DataService:IncrementAchievementProgress(player, elementMap[slime.Element], 1)
+		end
+	end
 	
 	return slime
 end
@@ -482,6 +509,27 @@ function SlimeFactory:AddXP(player: Player, instanceId: string, amount: number):
 	return slime
 end
 
+-- Generate a signature move based on slime's word and element
+local function generateSignatureMove(term: string, element: string): string
+	local movePrefixes = {
+		Fire = { "Infernal", "Blazing", "Flaming", "Scorching" },
+		Water = { "Tidal", "Hydro", "Aquatic", "Flood" },
+		Earth = { "Terra", "Stone", "Rock", "Mountain" },
+		Air = { "Gust", "Wind", "Storm", "Zephyr" },
+		Shadow = { "Dark", "Shadow", "Void", "Eclipse" },
+		Light = { "Solar", "Radiant", "Luminous", "Divine" },
+		Normal = { "Power", "Mega", "Ultra", "Hyper" },
+	}
+	
+	local moveSuffixes = { "Strike", "Blast", "Burst", "Attack", "Smash" }
+	
+	local prefixes = movePrefixes[element] or movePrefixes.Normal
+	local prefix = prefixes[math.random(1, #prefixes)]
+	local suffix = moveSuffixes[math.random(1, #moveSuffixes)]
+	
+	return prefix .. " " .. suffix
+end
+
 -- Add context points (meaning through usage)
 function SlimeFactory:AddContextPoints(player: Player, instanceId: string, questId: string, slot: string, outcome: string): boolean
 	local inventory = playerSlimes[player]
@@ -508,7 +556,24 @@ function SlimeFactory:AddContextPoints(player: Player, instanceId: string, quest
 		end
 	end
 	
+	-- Check for Signature Move unlock at 100 CP
+	if slime.ContextPoints >= 100 and not slime.SignatureMove then
+		slime.SignatureMove = generateSignatureMove(slime.Term, slime.Element)
+		print("[SlimeFactory] " .. slime.Term .. " unlocked Signature Move: " .. slime.SignatureMove)
+	end
+	
 	return true
+end
+
+
+
+-- Grant evolution point to player (for phase objectives)
+function SlimeFactory:GrantEvolutionPoint(player: Player)
+	local DataService = Knit.GetService("DataService")
+	if DataService then
+		DataService:GrantEvolutionPoints(player, 1)
+		print("[SlimeFactory] Granted 1 Evolution Point to " .. player.Name)
+	end
 end
 
 -- Get player's slime collection
@@ -520,6 +585,73 @@ end
 function SlimeFactory:GetSlime(player: Player, instanceId: string): SlimeInstance?
 	if not playerSlimes[player] then return nil end
 	return playerSlimes[player][instanceId]
+end
+
+-- Get player's companion slime
+function SlimeFactory:GetCompanion(player: Player): SlimeInstance?
+	if not playerSlimes[player] then return nil end
+	
+	-- Check if we have a companion stored in DataService
+	local DataService = Knit.GetService("DataService")
+	local profile = DataService:GetProfile(player)
+	if profile and profile.CompanionSlimeId then
+		return playerSlimes[player][profile.CompanionSlimeId]
+	end
+	return nil
+end
+
+-- Server-side: Set companion (called from client via remote)
+function SlimeFactory:SetCompanion(player: Player, instanceId: string): boolean
+	if not playerSlimes[player] or not playerSlimes[player][instanceId] then
+		warn("[SlimeFactory] Cannot set companion: slime not found")
+		return false
+	end
+	
+	-- Update player profile
+	local DataService = Knit.GetService("DataService")
+	local profile = DataService:GetProfile(player)
+	if profile then
+		profile.CompanionSlimeId = instanceId
+		local slime = playerSlimes[player][instanceId]
+		print("[SlimeFactory] Set companion slime for " .. player.Name .. ": " .. slime.Term)
+		
+		-- Notify client
+		self.Client.CompanionChanged:Fire(player, slime)
+		
+		-- Notify PetService to spawn the companion
+		local PetService = Knit.GetService("PetService")
+		if PetService then
+			PetService:SpawnCompanion(player, slime)
+		end
+		
+		-- Achievement
+		DataService:UnlockAchievement(player, "pet_companion")
+		
+		return true
+	end
+	return false
+end
+
+-- Server-side: Clear companion
+function SlimeFactory:ClearCompanion(player: Player): boolean
+	local DataService = Knit.GetService("DataService")
+	local profile = DataService:GetProfile(player)
+	if profile then
+		profile.CompanionSlimeId = nil
+		print("[SlimeFactory] Cleared companion for " .. player.Name)
+		
+		-- Notify client
+		self.Client.CompanionChanged:Fire(player, nil)
+		
+		-- Notify PetService to remove companion
+		local PetService = Knit.GetService("PetService")
+		if PetService then
+			PetService:RemoveCompanion(player)
+		end
+		
+		return true
+	end
+	return false
 end
 
 -- Save/Load integration

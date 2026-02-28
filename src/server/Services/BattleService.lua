@@ -4,6 +4,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Knit = require(Packages:WaitForChild("Knit"))
+local SynonymDatabase = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("SynonymDatabase"))
 
 local BattleService = Knit.CreateService {
 	Name = "BattleService",
@@ -30,6 +31,9 @@ export type BattleParticipant = {
 	Element: string,
 	Role: string,
 	Rarity: string,
+	IsDefending: boolean?,
+	UseSpecial: boolean?,
+	HasFled: boolean?,
 }
 
 export type BattleState = {
@@ -77,6 +81,10 @@ end
 local function calculateDamage(attacker: BattleParticipant, defender: BattleParticipant): number
 	local baseDamage = attacker.Stats.Logos
 	
+	if attacker.UseSpecial then
+		baseDamage = baseDamage * 1.5
+	end
+	
 	-- Role-based bonuses
 	if attacker.Role == "Striker" then
 		baseDamage = baseDamage * 1.2
@@ -88,6 +96,10 @@ local function calculateDamage(attacker: BattleParticipant, defender: BattlePart
 	
 	-- Apply defense reduction
 	local defense = defender.Stats.Ethos
+	if defender.IsDefending then
+		defense = defense * 1.5
+	end
+	
 	local reduction = defense / (defense + 50) -- Diminishing returns
 	local damageReduction = 1 - reduction
 	
@@ -136,12 +148,20 @@ local function processTurn(battle: BattleState, attackerIndex: number): BattlePa
 	local defender = battle.Participants[targetIndex]
 	
 	-- Calculate damage
-	local damage = calculateDamage(attacker, defender)
-	defender.HP = math.max(0, defender.HP - damage)
-	
-	-- Log the action
-	local action = attacker.SlimeName .. " attacks " .. defender.SlimeName .. " for " .. damage .. " damage!"
-	table.insert(battle.Log, action)
+	if not attacker.IsDefending then
+		local damage = calculateDamage(attacker, defender)
+		defender.HP = math.max(0, defender.HP - damage)
+		
+		-- Log the action
+		local action = attacker.SlimeName .. " attacks " .. defender.SlimeName .. " for " .. damage .. " damage!"
+		if attacker.UseSpecial then
+			action = "🎯 CRITICAL: " .. action
+		end
+		table.insert(battle.Log, action)
+	else
+		-- Defending doesn't deal damage
+		table.insert(battle.Log, attacker.SlimeName .. " solidifies its linguistic boundaries!")
+	end
 	
 	-- Check if defender is defeated
 	if defender.HP <= 0 then
@@ -208,69 +228,121 @@ function BattleService:StartBattle(questId: string, slotId: string, participants
 	
 	-- Start the battle loop
 	task.spawn(function()
-		self:ProcessBattle(battleId)
+		self:AdvanceTurn(battleId)
 	end)
 	
 	return battle
 end
 
--- Process a battle to completion
-function BattleService:ProcessBattle(battleId: string)
+-- Advance to the next phase of the battle
+function BattleService:AdvanceTurn(battleId: string)
 	local battle = activeBattles[battleId]
-	if not battle then return end
+	if not battle or battle.Status ~= "InProgress" then return end
 	
-	while battle.Status == "InProgress" do
-		-- Get current attacker
-		local attackerIndex = battle.CurrentTurn
-		local attacker = battle.Participants[attackerIndex]
+	-- Check for battle end
+	local winner = checkBattleEnd(battle)
+	if winner then
+		battle.Status = "Completed"
+		battle.Winner = winner
 		
-		-- Skip if attacker is defeated
-		if not attacker or attacker.HP <= 0 then
-			-- Move to next participant
-			local nextIndex = (attackerIndex % #battle.Participants) + 1
-			battle.CurrentTurn = nextIndex
-			continue
+		-- Find winner's name
+		for _, p in ipairs(battle.Participants) do
+			if p.InstanceId == winner then
+				table.insert(battle.Log, p.SlimeName .. " wins the battle!")
+				break
+			end
 		end
 		
-		-- Process turn
-		processTurn(battle, attackerIndex)
+		self.Client.BattleEnded:FireAll(battle)
+		print("[BattleService] Battle ended: " .. battleId .. " Winner: " .. (battle.Winner or "None"))
 		
-		-- Notify of turn
-		self.Client.BattleTurn:FireAll(battle)
-		
-		-- Check for battle end
-		local winner = checkBattleEnd(battle)
-		if winner then
-			battle.Status = "Completed"
-			battle.Winner = winner
-			
-			-- Find winner's name
+		-- Achievements
+		local DataService = Knit.GetService("DataService")
+		if DataService then
 			for _, p in ipairs(battle.Participants) do
-				if p.InstanceId == winner then
-					table.insert(battle.Log, p.SlimeName .. " wins the battle!")
+				if p.InstanceId == winner and p.PlayerId then
+					local player = Players:FindFirstChild(p.PlayerId)
+					if player then
+						DataService:UnlockAchievement(player, "first_battle")
+						DataService:IncrementAchievementProgress(player, "battle_master_10", 1)
+					end
 					break
 				end
 			end
-			
-			break
 		end
 		
-		-- Move to next turn
-		local nextTurnIndex = (attackerIndex % #battle.Participants) + 1
-		battle.CurrentTurn = nextTurnIndex
-		
-		-- Increment turn counter every full round
-		if nextTurnIndex == 1 then
-			battle.Turn += 1
-		end
-		
-		-- Small delay between turns for effect
-		task.wait(1)
+		return
+	end
+
+	-- Identify current attacker
+	local attackerIndex = battle.CurrentTurn
+	local attacker = battle.Participants[attackerIndex]
+	
+	-- Skip if defeated
+	if not attacker or attacker.HP <= 0 then
+		self:NextTurn(battleId)
+		return
 	end
 	
-	-- Notify battle ended
-	self.Client.BattleEnded:FireAll(battle)
-	print("[BattleService] Battle ended: " .. battleId .. " Winner: " .. (battle.Winner or "None"))
+	-- Determine if attacker is NPC
+	local isNpc = true
+	if attacker.PlayerId then
+		for _, p in ipairs(Players:GetPlayers()) do
+			if p.Name == attacker.PlayerId then
+				isNpc = false
+				break
+			end
+		end
+	end
+	
+	if isNpc then
+		task.delay(1.5, function()
+			-- NPC auto-attacks
+			attacker.UseSpecial = false
+			attacker.IsDefending = false
+			table.insert(battle.Log, "😈 " .. attacker.SlimeName .. " unleashes a feral semantic attack!")
+			processTurn(battle, attackerIndex)
+			self.Client.BattleTurn:FireAll(battle)
+			self:NextTurn(battleId)
+		end)
+	else
+		-- Wait for player input (UI handled on client)
+		self.Client.BattleTurn:FireAll(battle)
+		
+		-- Setup 15s timeout timer
+		local turnObj = {}
+		battleTimeouts[battleId] = turnObj
+		
+		task.delay(15, function()
+			if battleTimeouts[battleId] == turnObj and battle.CurrentTurn == attackerIndex and battle.Status == "InProgress" then
+				-- Time is up!
+				table.insert(battle.Log, "⏱️ " .. attacker.SlimeName .. " hesitated and missed their opening!")
+				attacker.UseSpecial = false
+				attacker.IsDefending = true -- default to defensive posture
+				
+				self.Client.BattleTurn:FireAll(battle)
+				self:NextTurn(battleId)
+			end
+		end)
+	end
+end
+
+-- Move turn index and check if a full round passed
+function BattleService:NextTurn(battleId: string)
+	local battle = activeBattles[battleId]
+	if not battle then return end
+
+	-- Small delay between turns for effect
+	task.wait(1.5)
+
+	local nextTurnIndex = (battle.CurrentTurn % #battle.Participants) + 1
+	battle.CurrentTurn = nextTurnIndex
+	
+	if nextTurnIndex == 1 then
+		battle.Turn += 1
+	end
+	
+	self:AdvanceTurn(battleId)
 end
 
 -- Get battle state
@@ -279,10 +351,135 @@ function BattleService:GetBattle(battleId: string): BattleState?
 end
 
 -- Client: Execute an action in battle
-function BattleService.Client:ExecuteAction(player: Player, battleId: string, action: "Attack" | "Defend" | "Special")
-	-- For turn-based combat, we can extend this
-	-- For now, auto-battle is default
-	return { Success = true, Message = "Action queued" }
+function BattleService.Client:ExecuteAction(player: Player, battleId: string, action: "Attack" | "Defend" | "Special" | "Flee"): { Success: boolean, Message: string }
+	local battle = activeBattles[battleId]
+	if not battle then
+		return { Success = false, Message = "Battle not found" }
+	end
+	
+	if battle.Status ~= "InProgress" then
+		return { Success = false, Message = "Battle is not in progress" }
+	end
+	
+	-- Find the player's participant
+	local participantIndex = 0
+	for i, p in ipairs(battle.Participants) do
+		if p.PlayerId == player.Name then
+			participantIndex = i
+			break
+		end
+	end
+	
+	if participantIndex == 0 then
+		return { Success = false, Message = "You are not in this battle" }
+	end
+	
+	-- Check if it's this player's turn
+	if battle.CurrentTurn ~= participantIndex then
+		return { Success = false, Message = "Not your turn" }
+	end
+	
+	local participant = battle.Participants[participantIndex]
+	
+	-- Handle different actions
+	if action == "Attack" then
+		-- Standard attack - already handled by auto-battle, but we can customize
+		return { Success = true, Message = "Attack executed" }
+		
+	elseif action == "Defend" then
+		-- Mark participant as defending (reduces next damage by 50%)
+		participant.IsDefending = true
+		return { Success = true, Message = "Defending - 50% damage reduction next turn" }
+		
+	elseif action == "Special" then
+		-- Special attack costs 20 Pathos (HP) for 1.5x damage
+		if participant.HP <= 20 then
+			return { Success = false, Message = "Not enough Pathos (HP) for Special attack" }
+		end
+		participant.HP = participant.HP - 20
+		participant.UseSpecial = true
+		return { Success = true, Message = "Special attack used! -20 Pathos" }
+		
+	elseif action == "Flee" then
+		-- Fleeing forfeits the battle
+		participant.HasFled = true
+		return { Success = true, Message = "You fled the battle" }
+	end
+	
+	return { Success = false, Message = "Unknown action" }
+end
+
+-- Client: Execute a semantic wordplay action
+function BattleService.Client:ExecuteSemanticAction(player: Player, battleId: string, word: string): { Success: boolean, Message: string }
+	local battle = activeBattles[battleId]
+	if not battle or battle.Status ~= "InProgress" then
+		return { Success = false, Message = "Battle not active" }
+	end
+	
+	local participantIndex = 0
+	for i, p in ipairs(battle.Participants) do
+		if p.PlayerId == player.Name then
+			participantIndex = i
+			break
+		end
+	end
+	
+	if participantIndex == 0 or battle.CurrentTurn ~= participantIndex then
+		return { Success = false, Message = "Wait for your turn to Rap!" }
+	end
+	
+	local participant = battle.Participants[participantIndex]
+	local wordData = SynonymDatabase:GetWordData(participant.SlimeName:lower())
+	
+	word = word:lower():gsub("%s+", "")
+	if word == "" then return { Success = false, Message = "Speak up!" } end
+	
+	-- Semantic Validation
+	local isSynonym = wordData and table.find(wordData.Synonyms or {}, word)
+	local isAntonym = wordData and table.find(wordData.Antonyms or {}, word)
+	
+	-- Reset modifiers flag
+	participant.UseSpecial = false
+	participant.IsDefending = false
+	
+	local successResult = false
+	local successMessage = ""
+
+	if isSynonym then
+		participant.UseSpecial = true
+		table.insert(battle.Log, "🎤 " .. player.Name .. " dropped a sick synonym: " .. word .. "!")
+		successResult = true
+		successMessage = "CRITICAL HIT! Semantic Resonance!"
+		
+		local DataService = Knit.GetService("DataService")
+		if DataService then DataService:UnlockAchievement(player, "crit_strike") end
+	elseif isAntonym then
+		participant.IsDefending = true
+		table.insert(battle.Log, "🛡️ " .. player.Name .. " invoked defense with an antonym: " .. word .. "!")
+		successResult = true
+		successMessage = "Antonym Defense Activated!"
+		
+		local DataService = Knit.GetService("DataService")
+		if DataService then DataService:UnlockAchievement(player, "shield_block") end
+	else
+		-- In a real rap battle, fumbling the flow deals weak baseline damage, keeping the player alive but barely.
+		table.insert(battle.Log, "❓ " .. player.Name .. " fumbled the flow with: " .. word .. "!")
+		successResult = false
+		successMessage = "Miss! Word is semantically weak."
+	end
+	
+	-- Cancel the timeout timer
+	battleTimeouts[battleId] = nil
+	
+	-- Resolve the player's turn manually now that they submitted input
+	processTurn(battle, participantIndex) 
+	self.Client.BattleTurn:FireAll(battle)
+	
+	task.spawn(function()
+		self:NextTurn(battleId)
+	end)
+	
+	return { Success = successResult, Message = successMessage }
 end
 
 -- Get battle log

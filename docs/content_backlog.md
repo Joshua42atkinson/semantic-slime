@@ -30,7 +30,7 @@ The game is an **educational vocabulary game** but only has **5 words** in `Word
 |---|------|---------|------|---------|
 | [x] | Expand `WordDatabase` to 100+ entries with psycholinguistic metrics | `WordDatabase.lua` | 2 hr | Add Concreteness, AoA, Valence, Arousal, Dominance for each |
 | [x] | Expand `SynonymDatabase` to 200+ entries | `SynonymDatabase.lua` | 3 hr | Each entry: 4 synonyms, 2 antonyms, 3 distractors, element, difficulty |
-| 8 | Add grade-level tagging (`"3-5"`, `"6-8"`, `"9-12"`) | `SynonymDatabase.lua`, `WordDatabase.lua` | 30 min | Enables curriculum-aligned content |
+| [x] | Add grade-level tagging (`"3-5"`, `"6-8"`, `"9-12"`) | `SynonymDatabase.lua`, `WordDatabase.lua` | 30 min | Enables curriculum-aligned content |
 | [x] | Add `EtymologyDB` roots beyond initial 6 | `EtymologyDB.lua` | 1 hr | Currently: Ignis, Aqua, Terra, Aer, Umbra, Lux. Need 12+ roots |
 | [x] | Add more suffixes beyond initial 9 | `EtymologyDB.lua` | 30 min | Currently: -tion, -ity, -ment, -ize, -ate, -fy, -ous, -al, -ive |
 
@@ -93,9 +93,9 @@ Pet system is designed but not implemented.
 
 | # | Task | File(s) | Est. | Details |
 |---|------|---------|------|---------|
-| 27 | Implement `PetController` follow behavior | `PetController.lua` | 2 hr | Smooth lerp follow, idle animations |
-| 28 | Add "Set Companion" button to `SlimeCollectionUI` | `SlimeCollectionUI.lua`, `SlimeFactory.lua` | 1 hr | Server validation + client visual |
-| 29 | Add idle dialogue system (element-based) | `PetController.lua` | 1 hr | Random speech bubbles from element word lists |
+| [x] | Implement `PetController` follow behavior | `PetController.lua` | 2 hr | Smooth lerp follow, idle animations |
+| [x] | Add "Set Companion" button to `SlimeCollectionUI` | `SlimeCollectionUI.lua`, `SlimeFactory.lua` | 1 hr | Server validation + client visual |
+| [x] | Add idle dialogue system (element-based) | `PetController.lua` | 1 hr | Random speech bubbles from element word lists |
 
 ### 2.3 Achievements & Meta-Progression
 
@@ -103,12 +103,12 @@ No long-term goals beyond XP.
 
 | # | Task | File(s) | Est. | Details |
 |---|------|---------|------|---------|
-| 30 | Define 20+ achievements | New `AchievementData.lua` | 1 hr | First Slime, Collector 10, Word Master 100, etc. |
-| 31 | Add achievement tracking to `DataService` | `DataService.lua` | 1 hr | Store `Achievements`, `WordsDiscovered`, `ElementUsage` |
-| 32 | Create achievement popup notification | `HUDController.lua` | 45 min | Gold banner with achievement name + icon |
-| 33 | Create achievement gallery UI | New `AchievementUI.lua` | 2 hr | Grid of locked/unlocked achievements |
+| [x] | Define 20+ achievements | New `AchievementData.lua` | 1 hr | Categories: Words found, battles won, quests, etc. |
+| [x] | Add achievement tracking to `DataService` | `DataService.lua` | 1 hr | `IncrementAchievementProgress(player, achievementId)` |
+| [x] | Create achievement popup notification | `HUDController.lua` | 45 min | Slides up from bottom center, plays generic jingle |
+| [x] | Create achievement gallery UI | New `AchievementUI.lua` | 2 hr | Press `Y` or click HUD button to view progress |
 
-### 2.4 Sound & Music
+### 2.4 Polish & Aesthetics
 
 SoundController exists but content is limited.
 

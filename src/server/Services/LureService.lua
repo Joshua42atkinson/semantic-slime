@@ -23,6 +23,7 @@ end
 
 -- Client Request to Lure - validates the capture attempt
 function LureService.Client:AttemptLure(player: Player, targetTerm: string, usedWord: string)
+	if type(targetTerm) ~= "string" or type(usedWord) ~= "string" then return { Success = false, Message = "Invalid input", XP = 0 } end
     return self.Server:ProcessLure(player, targetTerm, usedWord)
 end
 
@@ -70,6 +71,13 @@ function LureService:ProcessLure(player: Player, targetTerm: string, usedWord: s
         
         print(string.format("[LureService] %s captured %s! (+%d XP)", player.Name, targetTerm, xpGained))
         
+        -- Achievements
+        local DataService = Knit.GetService("DataService")
+        if DataService then
+            DataService:UnlockAchievement(player, "first_word")
+            DataService:IncrementAchievementProgress(player, "word_master_50", 1)
+        end
+        
         return { 
             Success = true, 
             Message = string.format("%s Captured %s!", emoji, targetTerm),
@@ -108,6 +116,7 @@ end
 
 -- Get lure choices for a word (server-authoritative for anti-cheat)
 function LureService.Client:GetLureChoices(player: Player, term: string)
+	if type(term) ~= "string" then return {}, false end
     local choices, hasCorrect = SynonymDatabase.GetLureChoices(term, GameConfig.LURE_CHOICES)
     return choices, hasCorrect
 end
@@ -125,6 +134,7 @@ end
 
 -- Get word info for UI
 function LureService.Client:GetWordInfo(player: Player, term: string)
+	if type(term) ~= "string" then return nil end
     local entry = SynonymDatabase[term:lower()]
     if not entry then
         return nil
