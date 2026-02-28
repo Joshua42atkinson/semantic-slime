@@ -5,6 +5,7 @@ local HttpService = game:GetService("HttpService")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Knit = require(Packages:WaitForChild("Knit"))
+local QuestData = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("QuestData"))
 
 local MadLibService = Knit.CreateService {
 	Name = "MadLibService",
@@ -44,94 +45,7 @@ export type MadLibQuest = {
 	CreatedAt: number,
 }
 
--- Configuration
-local MADLIB_TEMPLATES = {
-	Hero = {
-		{
-			Title = "The Brave Adventure",
-			Template = "The {ADJECTIVE} hero must {VERB} toward the {NOUN} to save the day!",
-			RequiredRoles = { "Striker", "Tank" },
-		},
-		{
-			Title = "Quest for Glory",
-			Template = "A {ADJECTIVE} warrior {VERB} courageously past the {NOUN}!",
-			RequiredRoles = { "Striker", "Assassin" },
-		},
-		{
-			Title = "The Champion's Call",
-			Template = "The legendary {ADJECTIVE} champion {VERB} the ancient {NOUN}!",
-			RequiredRoles = { "Tank", "Caster" },
-		},
-	},
-	Mentor = {
-		{
-			Title = "Words of Wisdom",
-			Template = "The wise teacher explains: 'You must {VERB} with {ADJECTIVE} patience to find the {NOUN}.'",
-			RequiredRoles = { "Support", "Healer" },
-		},
-		{
-			Title = "The Ancient's Lesson",
-			Template = "'The {ADJECTIVE} truth is that you must {VERB} before you can understand the {NOUN}.'",
-			RequiredRoles = { "Caster", "Support" },
-		},
-		{
-			Title = "Sage's Guidance",
-			Template = "The mentor whispers: 'Be {ADVERB} in your journey to {VERB} the sacred {NOUN}!'",
-			RequiredRoles = { "Support", "Healer" },
-		},
-	},
-	Trickster = {
-		{
-			Title = "The Prankster's Deal",
-			Template = "The mischievous trickster says: 'I'll {VERB} the {ADJECTIVE} {NOUN} if you can catch me!'",
-			RequiredRoles = { "Assassin", "Striker" },
-		},
-		{
-			Title = "A Clever Scheme",
-			Template = "'That {ADJECTIVE} fool! I'll {VERB} them right into the {NOUN}!'",
-			RequiredRoles = { "Assassin", "Caster" },
-		},
-		{
-			Title = "The Deception",
-			Template = "The cunning deceiver plans to {VERB} past the {ADJECTIVE} guards to steal the {NOUN}!",
-			RequiredRoles = { "Assassin", "Striker" },
-		},
-	},
-	Shadow = {
-		{
-			Title = "The Dark Threat",
-			Template = "The menacing {ADJECTIVE} villain plans to {VERB} the world with the {NOUN}!",
-			RequiredRoles = { "Caster", "Striker" },
-		},
-		{
-			Title = "Fearful Omens",
-			Template = "'The {ADJECTIVE} darkness will {VERB} all hope. Only the {NOUN} remains!'",
-			RequiredRoles = { "Caster", "Tank" },
-		},
-		{
-			Title = "The Shadow's Wrath",
-			Template = "The shadow whispers: 'You cannot {VERB} your way out of this {ADJECTIVE} fate!'",
-			RequiredRoles = { "Tank", "Support" },
-		},
-	},
-	Herald = {
-		{
-			Title = "The Prophecy",
-			Template = "The urgent herald announces: 'The {ADJECTIVE} prophecy reveals that one must {VERB} the {NOUN}!'",
-			RequiredRoles = { "Caster", "Support" },
-		},
-		{
-			Title = "A Call to Action",
-			Template = "'Prepare yourselves! The {ADJECTIVE} winds of change will {VERB} the {NOUN}!'",
-			RequiredRoles = { "Striker", "Assassin" },
-		},
-		{
-			Title = "The Warning",
-			Template = "'Seek the {ADJECTIVE} {NOUN} before it's too late! We must {VERB} now!'",
-			RequiredRoles = { "Support", "Healer" },
-		},
-	},
-}
+-- Configuration uses QuestData.ArchetypeQuests and QuestData.NPCChains
 
 local SLOT_TYPES = { "ADJECTIVE", "VERB", "NOUN", "ADVERB" }
 
@@ -202,10 +116,10 @@ local function generateRewards(archetype: NPCArchetype): { XP: number, Insight: 
 end
 
 -- Build complete narrative with filled slots
-local function buildNarrative(template: string, slots: { QuestSlot }): string
+local function buildNarrative(template: string, slots: { [string]: QuestSlot } | { QuestSlot }): string
 	local narrative = template
 	
-	for _, slot in ipairs(slots) do
+	for _, slot in pairs(slots) do
 		local replacement = slot.PlayerEntry or "[" .. slot.SlotType .. "]"
 		narrative = narrative:gsub("{" .. slot.SlotType .. "}", replacement)
 	end
@@ -213,18 +127,7 @@ local function buildNarrative(template: string, slots: { QuestSlot }): string
 	return narrative
 end
 
--- Generate a quest using AI
-function MadLibService:GenerateQuest(player: Player, archetype: NPCArchetype?): MadLibQuest
-	-- Select random archetype if not specified
-	archetype = archetype or SLOT_TYPES[math.random(1, #{
-		"Hero", "Mentor", "Trickster", "Shadow", "Herald"
-	})]
-	
-	-- Get template for archetype
-	local templates = MADLIB_TEMPLATES[archetype] or MADLIB_TEMPLATES.Hero
-	local template = templates[math.random(1, #templates)]
-	
-	-- Create the quest
+local function _constructQuestFromTemplate(player: Player, template: any, archetype: NPCArchetype): MadLibQuest
 	local quest: MadLibQuest = {
 		QuestId = HttpService:GenerateGUID(false),
 		Title = template.Title,
@@ -233,7 +136,7 @@ function MadLibService:GenerateQuest(player: Player, archetype: NPCArchetype?): 
 		CompleteNarrative = "",
 		Slots = {},
 		Status = "Waiting",
-		Rewards = generateRewards(archetype),
+		Rewards = template.Rewards or generateRewards(archetype),
 		CreatedAt = os.time(),
 	}
 	
@@ -251,10 +154,36 @@ function MadLibService:GenerateQuest(player: Player, archetype: NPCArchetype?): 
 	playerActiveQuests[player] = quest.QuestId
 	
 	-- Notify client
-	self.Client.QuestGenerated:Fire(player, quest)
+	MadLibService.Client.QuestGenerated:Fire(player, quest)
 	print("[MadLibService] Generated quest: " .. quest.Title .. " for " .. player.Name)
 	
 	return quest
+end
+
+-- Generate a quest using AI / Archetypes
+function MadLibService:GenerateQuest(player: Player, archetype: NPCArchetype?): MadLibQuest
+	-- Select random archetype if not specified
+	local selectionArchetype = archetype or ({"Hero", "Mentor", "Trickster", "Shadow", "Herald"})[math.random(1, 5)]
+	
+	-- Get template for archetype
+	local templates = QuestData.ArchetypeQuests[selectionArchetype] or QuestData.ArchetypeQuests.Hero
+	local template = templates[math.random(1, #templates)]
+	
+	return _constructQuestFromTemplate(player, template, selectionArchetype :: NPCArchetype)
+end
+
+-- Generate a District-Themed NPC Quest
+function MadLibService:GenerateNPCQuest(player: Player, npcId: string, questTier: number): MadLibQuest?
+	local npcChains = QuestData.NPCChains[npcId]
+	if not npcChains then
+		warn("[MadLibService] No NPC Chains found for: " .. tostring(npcId))
+		return nil
+	end
+	
+	local tier = math.clamp(questTier, 1, #npcChains)
+	local template = npcChains[tier]
+	
+	return _constructQuestFromTemplate(player, template, "Hero") -- Default to Hero archetype style behavior, or fetch NPC's actual archetype
 end
 
 -- Fill a slot in the quest with a player's slime/word
@@ -283,7 +212,7 @@ function MadLibService:FillSlot(player: Player, questId: string, slotId: string,
 	slot.InstanceId = instanceId
 	
 	-- Update narrative
-	quest.CompleteNarrative = buildNarrative(quest.DramaticSituation, slot)
+	quest.CompleteNarrative = buildNarrative(quest.DramaticSituation, quest.Slots)
 	
 	-- Check if all slots are filled
 	local allFilled = true
@@ -335,6 +264,9 @@ function MadLibService:CompleteQuest(player: Player, questId: string): MadLibQue
 		profile.XP = (profile.XP or 0) + quest.Rewards.XP
 		profile.Stats.Insight = (profile.Stats.Insight or 0) + quest.Rewards.Insight
 		print("[MadLibService] Awarded " .. quest.Rewards.XP .. " XP and " .. quest.Rewards.Insight .. " Insight")
+		
+		DataService:IncrementAchievementProgress(player, "quest_5", 1)
+		DataService:IncrementAchievementProgress(player, "quest_25", 1)
 	end
 	
 	-- Notify
@@ -354,11 +286,36 @@ function MadLibService:GetAvailableArchetypes(): { NPCArchetype }
 	return { "Hero", "Mentor", "Trickster", "Shadow", "Herald" }
 end
 
--- Get slot suggestions based on player's slimes
+-- Get slot suggestions for a player
+function MadLibService.Client:GetSlotSuggestions(player: Player, slotType: string): { any }
+	if type(slotType) ~= "string" then return {} end
+	return self.Server:GetSlotSuggestions(player, slotType)
+end
+
 function MadLibService:GetSlotSuggestions(player: Player, slotType: string): { any }
-	-- This would query SlimeFactory for compatible slimes
-	-- Return list of slimes that match the slot requirements
-	return {}
+	local SlimeFactory = Knit.GetService("SlimeFactory")
+	local slimes = SlimeFactory:GetPlayerSlimes(player)
+	
+	-- Determine required role based on slot type (from extractSlots mapping logic)
+	local roleMatch = nil
+	if slotType == "VERB" then
+		roleMatch = "Striker"
+	elseif slotType == "NOUN" then
+		roleMatch = "Tank"
+	elseif slotType == "ADJECTIVE" or slotType == "ADVERB" then
+		roleMatch = "Support"
+	end
+	
+	local suggestions = {}
+	if slimes then
+		for _, slime in pairs(slimes) do
+			if not roleMatch or slime.Role == roleMatch then
+				table.insert(suggestions, slime)
+			end
+		end
+	end
+	
+	return suggestions
 end
 
 function MadLibService:KnitStart()
