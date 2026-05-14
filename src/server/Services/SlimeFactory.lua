@@ -1,4 +1,7 @@
 --!strict
+--==============================================================
+-- MMMM Context: The central conversion hub. Transforms collected static letters into living, reactive Slime organisms.
+--==============================================================
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local HttpService = game:GetService("HttpService")
@@ -19,7 +22,7 @@ local SlimeFactory = Knit.CreateService {
 }
 
 -- Types
-export type SlimeInstance = {
+type SlimeInstance = {
 	InstanceId: string,
 	WordId: string,
 	Term: string,
@@ -43,6 +46,10 @@ export type SlimeInstance = {
 	ImaginaryTrait: string?,
 	SignatureMove: string?,
 	CreatedAt: number,
+	PhraseComponents: { [number]: { InstanceId: string, Word: string, Term: string, Suffix: string?, Role: string } },
+	AggregatedStats: { [string]: number }?,
+	SacrificeCount: number,
+	EvolutionPath: { [number]: string },
 }
 
 export type Modifier = {
@@ -132,21 +139,60 @@ local MODIFIERS: { [string]: Modifier } = {
 	},
 }
 
+local RARITY_STAT_POOLS = {
+	Common = 80,
+	Uncommon = 120,
+	Rare = 180,
+	Epic = 260,
+	Legendary = 380,
+	Mythic = 550,
+}
+
 local RARITY_MULTIPLIERS = {
 	Common = 1.0,
-	Uncommon = 1.2,
-	Rare = 1.5,
-	Epic = 1.8,
-	Legendary = 2.2,
-	Mythic = 3.0,
+	Uncommon = 1.15,
+	Rare = 1.35,
+	Epic = 1.6,
+	Legendary = 2.0,
+	Mythic = 2.5,
+}
+
+local ROLE_DISTRIBUTIONS = {
+	Tank = { Ethos = 0.4, Logos = 0.2, Pathos = 0.3, Speed = 0.1 },
+	Striker = { Logos = 0.5, Ethos = 0.2, Pathos = 0.1, Speed = 0.2 },
+	Support = { Pathos = 0.4, Logos = 0.2, Ethos = 0.3, Speed = 0.1 },
+	Caster = { Logos = 0.4, Speed = 0.4, Ethos = 0.1, Pathos = 0.1 },
+	Assassin = { Speed = 0.5, Logos = 0.3, Ethos = 0.1, Pathos = 0.1 },
+	Healer = { Pathos = 0.5, Ethos = 0.3, Logos = 0.1, Speed = 0.1 },
+	Civilian = { Logos = 0.25, Pathos = 0.25, Ethos = 0.25, Speed = 0.25 },
 }
 
 local EVOLUTION_STAGE_NAMES = {
-	"Normal",
-	"Greater",
-	"Ascended",
-	"Divine",
-	"Cosmic",
+	"Baseline",      -- K-2
+	"Elementary",    -- 3-5
+	"Intermediate",  -- 6-9
+	"Advanced",      -- 10-12
+	"Graduate",      -- Academic Adult
+}
+
+-- Evolution types for phrase building
+export type EvolutionType = "suffix" | "fuse_noun" | "possessive" | "adjective" | "determiner"
+
+local EVOLUTION_TYPES: { [number]: { type: EvolutionType, name: string, description: string, xpCost: number } } = {
+	{ type = "suffix", name = "Suffix Addition", description = "Add a suffix to your word", xpCost = 50 },
+	{ type = "fuse_noun", name = "Noun Fusion", description = "Combine with another noun", xpCost = 100 },
+	{ type = "possessive", name = "Possessive", description = "Add 's to show ownership", xpCost = 150 },
+	{ type = "adjective", name = "Adjective", description = "Add a descriptive word", xpCost = 200 },
+	{ type = "determiner", name = "Determiner", description = "Add 'that', 'the', or 'a'", xpCost = 250 },
+}
+
+-- Grade level progression thresholds
+local GRADE_LEVEL_THRESHOLDS = {
+	{ stage = 1, grade = "K-2", minWords = 0 },
+	{ stage = 2, grade = "3-5", minWords = 1 },
+	{ stage = 3, grade = "6-9", minWords = 2 },
+	{ stage = 4, grade = "10-12", minWords = 3 },
+	{ stage = 5, grade = "Graduate", minWords = 4 },
 }
 
 -- Private state
@@ -192,48 +238,31 @@ local function analyzeWord(word: string): (string, string, string?)
 	return foundRoot, foundSuffix, foundModifier
 end
 
--- Calculate base stats from root and role
-local function calculateStats(root: string, role: string, level: number): { [string]: number }
+-- Calculate base stats from root, role, and rarity (FAB-001/002)
+local function calculateStats(rarity: string, role: string, level: number, root: string, suffix: string): { [string]: number }
+	local pool = RARITY_STAT_POOLS[rarity] or RARITY_STAT_POOLS.Common
+	local distribution = ROLE_DISTRIBUTIONS[role] or ROLE_DISTRIBUTIONS.Civilian
+	
+	-- Level scaling: +10% total stats per level
+	local levelBonus = 1 + (level - 1) * 0.1
+	local totalPool = pool * levelBonus
+	
 	local stats = {
-		Logos = 10,
-		Pathos = 10,
-		Ethos = 10,
-		Speed = 10,
+		Logos = math.floor(totalPool * distribution.Logos),
+		Pathos = math.floor(totalPool * distribution.Pathos),
+		Ethos = math.floor(totalPool * distribution.Ethos),
+		Speed = math.floor(totalPool * distribution.Speed),
 	}
 	
-	local rootData = EtymologyDB.Roots and EtymologyDB.Roots[root]
-	
-	-- Apply root bonuses
-	if rootData then
-		if rootData.StatFocus == "Logos" then
-			stats.Logos = stats.Logos + 10
-		elseif rootData.StatFocus == "Pathos" then
-			stats.Pathos = stats.Pathos + 10
-		elseif rootData.StatFocus == "Ethos" then
-			stats.Ethos = stats.Ethos + 10
-		elseif rootData.StatFocus == "Speed" then
-			stats.Speed = stats.Speed + 10
-		end
+	-- [FAB-004] Apply Root/Suffix focus bonuses (+5% to focused stat)
+	local rootData = EtymologyDB.Roots[root]
+	if rootData and stats[rootData.StatFocus] then
+		stats[rootData.StatFocus] = math.floor(stats[rootData.StatFocus] * 1.05)
 	end
 	
-	-- Apply role bonuses
-	if role == "Tank" then
-		stats.Ethos = stats.Ethos + 15
-	elseif role == "Striker" then
-		stats.Logos = stats.Logos + 15
-	elseif role == "Support" then
-		stats.Pathos = stats.Pathos + 15
-	elseif role == "Caster" then
-		stats.Logos = stats.Logos + 10
-		stats.Speed = stats.Speed + 5
-	elseif role == "Assassin" then
-		stats.Speed = stats.Speed + 15
-	end
-	
-	-- Apply level multiplier
-	local multiplier = 1 + (level - 1) * 0.1
-	for stat, value in pairs(stats) do
-		stats[stat] = math.floor(value * multiplier)
+	local suffixData = EtymologyDB.Suffixes[suffix]
+	if suffixData and stats[suffixData.StatBonus] then
+		stats[suffixData.StatBonus] = math.floor(stats[suffixData.StatBonus] * 1.05)
 	end
 	
 	return stats
@@ -288,23 +317,47 @@ local function getRoleFromSuffix(suffix: string): string
 	return "Civilian"
 end
 
--- Generate rarity based on word properties
+-- Generate rarity based on word properties (FAB-003)
 local function generateRarity(word: string, baseWord: string): string
-	local roll = math.random(1, 100)
+	local score = 0
 	
-	-- Longer/more complex words have better chances
-	local complexityBonus = math.min(#baseWord * 2, 20)
-	roll = roll + complexityBonus
+	-- Length bonus
+	score += #word * 2
 	
-	-- Check for interesting word patterns
-	if word:find("tion") or word:find("sion") then roll += 10 end
-	if word:find("ness") or word:find("ment") then roll += 10 end
+	-- Complexity bonus (unique letters)
+	local unique = {}
+	for i = 1, #word do
+		unique[word:sub(i, i)] = true
+	end
+	local uniqueCount = 0
+	for _ in pairs(unique) do uniqueCount += 1 end
+	score += uniqueCount * 3
 	
-	if roll >= 98 then return "Mythic"
-	elseif roll >= 93 then return "Legendary"
-	elseif roll >= 83 then return "Epic"
-	elseif roll >= 65 then return "Rare"
-	elseif roll >= 40 then return "Uncommon"
+	-- Grade level bonus from WordDatabase
+	local wordData = WordDatabase[word]
+	if wordData and wordData.GradeLevel then
+		local gradeBonus = {
+			["K-2"] = 0,
+			["3-5"] = 10,
+			["6-9"] = 25,
+			["10-12"] = 40,
+			["Graduate"] = 60,
+		}
+		score += (gradeBonus[wordData.GradeLevel] or 0)
+	end
+	
+	-- Scrabble-style complexity (Rare letters)
+	local complexLetters = { q=10, z=10, x=8, j=8, k=5, v=4 }
+	for i = 1, #word do
+		local letter = word:sub(i, i):lower()
+		score += (complexLetters[letter] or 0)
+	end
+	
+	if score >= 120 then return "Mythic"
+	elseif score >= 90 then return "Legendary"
+	elseif score >= 70 then return "Epic"
+	elseif score >= 50 then return "Rare"
+	elseif score >= 25 then return "Uncommon"
 	else return "Common" end
 end
 
@@ -334,25 +387,105 @@ function SlimeFactory:KnitStart()
 end
 
 -- Create a new slime from a word
-function SlimeFactory:CreateSlime(player: Player, word: string): SlimeInstance?
+function SlimeFactory:CreateSlime(player: Player, word: string): (SlimeInstance?, string?)
+	-- Validate inputs
+	if not player or not player.Parent then
+		return nil, "Invalid player"
+	end
+	
+	if type(word) ~= "string" or #word == 0 then
+		return nil, "Invalid word"
+	end
+	
 	word = word:lower()
 	
 	-- Validate it's a real word (check in WordDatabase or basic validation)
-	local isValidWord = WordDatabase[word] ~= nil or #word >= 3
+	local isValidWord
+	local wordCheckSuccess, wordCheckResult = pcall(function()
+		return WordDatabase[word] ~= nil or #word >= 3
+	end)
 	
-	if not isValidWord then
-		warn("[SlimeFactory] Invalid word: " .. word)
-		return nil
+	if not wordCheckSuccess then
+		warn("[SlimeFactory] Error validating word:", wordCheckResult)
+		return nil, "Error validating word"
 	end
 	
-	-- Analyze the word
-	local root, suffix, modifier = analyzeWord(word)
+	isValidWord = wordCheckResult
 	
-	-- Determine element and role
-	local element = getElementFromRoot(root)
-	local role = getRoleFromSuffix(suffix)
+	if not isValidWord then
+		local FeralTypoService = Knit.GetService("FeralTypoService")
+		if FeralTypoService then
+			pcall(function()
+				FeralTypoService:SpawnTypo(player, word)
+			end)
+		end
+		return nil, "That doesn't look like a real word! A Feral Typo has spawned!"
+	end
 	
-	-- Create the slime instance
+	-- Add to player's collection
+	if not playerSlimes[player] then
+		playerSlimes[player] = {}
+	end
+	
+	-- [PLAYER-001] Limit inventory to 5 active Slimes
+	local currentCount = 0
+	for _ in pairs(playerSlimes[player]) do currentCount += 1 end
+	if currentCount >= 5 then
+		return nil, "Your inventory is full! Max 5 slimes."
+	end
+
+	-- Analyze the word with error handling
+	local root, suffix, modifier
+	local analysisSuccess, analysisResult = pcall(function()
+		return analyzeWord(word)
+	end)
+	
+	if not analysisSuccess then
+		warn("[SlimeFactory] Error analyzing word:", analysisResult)
+		return nil, "Error analyzing word"
+	end
+	
+	root, suffix, modifier = analysisResult
+	
+	-- Determine element and role with error handling
+	local element, role
+	local elementSuccess, elementResult = pcall(function()
+		return getElementFromRoot(root)
+	end)
+	
+	if not elementSuccess then
+		warn("[SlimeFactory] Error determining element:", elementResult)
+		element = "Neutral" -- Fallback
+	else
+		element = elementResult
+	end
+	
+	local roleSuccess, roleResult = pcall(function()
+		return getRoleFromSuffix(suffix)
+	end)
+	
+	if not roleSuccess then
+		warn("[SlimeFactory] Error determining role:", roleResult)
+		role = "Striker" -- Fallback
+	else
+		role = roleResult
+	end
+	
+	-- Create the slime instance (FAB-005) with error handling
+	local rarity, baseStats
+	local creationSuccess, creationResult = pcall(function()
+		local slimeRarity = generateRarity(word, root)
+		local slimeStats = calculateStats(slimeRarity, role, 1, root, suffix)
+		return slimeRarity, slimeStats
+	end)
+	
+	if not creationSuccess then
+		warn("[SlimeFactory] Error creating slime stats:", creationResult)
+		return nil, "Error creating slime"
+	end
+	
+	rarity, baseStats = creationResult
+	
 	local slime: SlimeInstance = {
 		InstanceId = HttpService:GenerateGUID(false),
 		WordId = word,
@@ -365,24 +498,38 @@ function SlimeFactory:CreateSlime(player: Player, word: string): SlimeInstance?
 		Level = 1,
 		XP = 0,
 		EvolutionStage = 1,
-		Stats = calculateStats(root, role, 1),
+		Stats = baseStats,
 		ContextPoints = 0,
 		ContextHistory = {},
-		Rarity = generateRarity(word, root),
+		Rarity = rarity,
 		ImaginaryTrait = nil,
 		SignatureMove = nil,
 		CreatedAt = os.time(),
+		PhraseComponents = {
+			{ InstanceId = "", Word = word, Term = word:sub(1, 1):upper() .. word:sub(2), Suffix = suffix ~= "" and suffix or nil, Role = role }
+		},
+		AggregatedStats = nil,
+		SacrificeCount = 0,
+		EvolutionPath = { word },
 	}
 	
-	-- Apply rarity multiplier
-	slime.Stats = applyRarityMultiplier(slime.Stats, slime.Rarity)
+	playerSlimes[player][slime.InstanceId] = slime
 	
-	-- Add to player's collection
-	if not playerSlimes[player] then
-		playerSlimes[player] = {}
+	-- Notification to Ontological Mirror
+	local OntoMirror = Knit.GetService("OntologicalMirrorService")
+	if OntoMirror then
+		pcall(function()
+			OntoMirror:RecordWord(player, slime.WordId, slime.Stats, slime.Element)
+		end)
 	end
 	
-	playerSlimes[player][slime.InstanceId] = slime
+	-- Notification to Semantic Zeitgeist
+	local ZeitgeistService = Knit.GetService("ZeitgeistService")
+	if ZeitgeistService then
+		pcall(function()
+			ZeitgeistService:RecordSemanticEvent("Creation", slime.Element, slime.WordId)
+		end)
+	end
 	
 	-- Notify client
 	self.Client.SlimeCreated:Fire(player, slime)
@@ -565,6 +712,263 @@ function SlimeFactory:AddContextPoints(player: Player, instanceId: string, quest
 	return true
 end
 
+-- Calculate aggregated stats from phrase components (SLIME-007)
+local function calculateAggregatedStats(components: { [number]: { InstanceId: string, Word: string, Term: string, Suffix: string?, Role: string } }, sacrificeCount: number): { [string]: number }
+	local aggregated = { Logos = 0, Pathos = 0, Ethos = 0, Speed = 0 }
+	
+	for _, component in ipairs(components) do
+		-- This would normally look up the component's stats from playerSlimes
+		-- For now, we use a baseline calculation
+		aggregated.Logos = aggregated.Logos + 20
+		aggregated.Pathos = aggregated.Pathos + 15
+		aggregated.Ethos = aggregated.Ethos + 15
+		aggregated.Speed = aggregated.Speed + 10
+	end
+	
+	-- Apply sacrifice bonus: +50% stats per sacrifice
+	local sacrificeMultiplier = 1 + (sacrificeCount * 0.5)
+	for stat, value in pairs(aggregated) do
+		aggregated[stat] = math.floor(value * sacrificeMultiplier)
+	end
+	
+	return aggregated
+end
+
+-- Validate evolution path (SLIME-005)
+local function validateEvolutionPath(currentStage: number, evolutionType: string): boolean
+	-- Stage 1 (Baseline): Can only add suffix
+	if currentStage == 1 then
+		return evolutionType == "suffix"
+	-- Stage 2 (Elementary): Can add noun fusion
+	elseif currentStage == 2 then
+		return evolutionType == "suffix" or evolutionType == "fuse_noun"
+	-- Stage 3 (Intermediate): Can add possessive
+	elseif currentStage == 3 then
+		return evolutionType == "suffix" or evolutionType == "fuse_noun" or evolutionType == "possessive"
+	-- Stage 4 (Advanced): Can add adjective
+	elseif currentStage == 4 then
+		return evolutionType == "suffix" or evolutionType == "fuse_noun" or evolutionType == "possessive" or evolutionType == "adjective"
+	-- Stage 5 (Graduate): Can add determiner
+	elseif currentStage == 5 then
+		return evolutionType == "determiner"
+	end
+	
+	return false
+end
+
+-- Get available evolution types for a slime (SLIME-003)
+function SlimeFactory:GetAvailableEvolutions(player: Player, instanceId: string): { { type: string, name: string, description: string, xpCost: number } }
+	local inventory = playerSlimes[player]
+	if not inventory or not inventory[instanceId] then
+		return {}
+	end
+	
+	local slime = inventory[instanceId]
+	local available = {}
+	
+	for _, evoType in ipairs(EVOLUTION_TYPES) do
+		if validateEvolutionPath(slime.EvolutionStage, evoType.type) then
+			table.insert(available, evoType)
+		end
+	end
+	
+	return available
+end
+
+-- Evolve a slime (SLIME-003, SLIME-004)
+function SlimeFactory:EvolveSlime(player: Player, instanceId: string, evolutionType: string, additionalWord: string?): (SlimeInstance?, string?)
+	local inventory = playerSlimes[player]
+	if not inventory or not inventory[instanceId] then
+		return nil, "Slime not found"
+	end
+	
+	local slime = inventory[instanceId]
+	
+	-- Validate evolution type for current stage
+	if not validateEvolutionPath(slime.EvolutionStage, evolutionType) then
+		return nil, "Cannot perform this evolution at stage " .. slime.EvolutionStage
+	end
+	
+	-- Check XP cost
+	local evoConfig
+	for _, evo in ipairs(EVOLUTION_TYPES) do
+		if evo.type == evolutionType then
+			evoConfig = evo
+			break
+		end
+	end
+	
+	if not evoConfig then
+		return nil, "Unknown evolution type"
+	end
+	
+	if slime.XP < evoConfig.xpCost then
+		return nil, "Not enough XP. Need " .. evoConfig.xpCost .. ", have " .. slime.XP
+	end
+	
+	-- Deduct XP
+	slime.XP = slime.XP - evoConfig.xpCost
+	
+	-- Apply evolution based on type
+	if evolutionType == "suffix" then
+		-- Add suffix to the base word
+		if not additionalWord then
+			return nil, "Suffix word required"
+		end
+		local newWord = slime.WordId .. additionalWord
+		slime.WordId = newWord
+		slime.Term = newWord:sub(1, 1):upper() .. newWord:sub(2)
+		slime.Suffix = additionalWord
+		table.insert(slime.EvolutionPath, newWord)
+		
+	elseif evolutionType == "fuse_noun" then
+		-- Fuse with another noun from inventory
+		if not additionalWord then
+			return nil, "Second noun required for fusion"
+		end
+		local newWord = slime.WordId .. additionalWord
+		slime.WordId = newWord
+		slime.Term = newWord:sub(1, 1):upper() .. newWord:sub(2)
+		table.insert(slime.EvolutionPath, newWord)
+		
+	elseif evolutionType == "possessive" then
+		-- Add possessive 's
+		local newWord = slime.WordId .. "'s"
+		slime.WordId = newWord
+		slime.Term = newWord:sub(1, 1):upper() .. newWord:sub(2)
+		table.insert(slime.EvolutionPath, "'s")
+		
+	elseif evolutionType == "adjective" then
+		-- Add adjective prefix
+		if not additionalWord then
+			return nil, "Adjective word required"
+		end
+		local newWord = additionalWord .. " " .. slime.WordId
+		slime.WordId = newWord
+		slime.Term = newWord:sub(1, 1):upper() .. newWord:sub(2)
+		table.insert(slime.EvolutionPath, "adj:" .. additionalWord)
+		
+	elseif evolutionType == "determiner" then
+		-- Add determiner (the, that, a)
+		if not additionalWord then
+			return nil, "Determiner required (the, that, a)"
+		end
+		local newWord = additionalWord .. " " .. slime.WordId
+		slime.WordId = newWord
+		slime.Term = newWord:sub(1, 1):upper() .. newWord:sub(2)
+		table.insert(slime.EvolutionPath, "det:" .. additionalWord)
+	end
+	
+	-- Increment evolution stage
+	slime.EvolutionStage = math.min(slime.EvolutionStage + 1, MAX_EVOLUTION_STAGE)
+	
+	-- Recalculate stats
+	local root, suffix, _ = analyzeWord(slime.WordId)
+	local role = getRoleFromSuffix(suffix)
+	slime.Role = role
+	slime.Stats = calculateStats(slime.Rarity, role, slime.Level, root, suffix)
+	
+	-- Update phrase components
+	table.insert(slime.PhraseComponents, {
+		InstanceId = HttpService:GenerateGUID(false),
+		Word = slime.WordId,
+		Term = slime.Term,
+		Suffix = slime.Suffix,
+		Role = slime.Role,
+	})
+	
+	-- Recalculate aggregated stats
+	slime.AggregatedStats = calculateAggregatedStats(slime.PhraseComponents, slime.SacrificeCount)
+	
+	-- Notify client
+	self.Client.SlimeEvolved:Fire(player, slime)
+	print("[SlimeFactory] Evolved slime: " .. slime.Term .. " to stage " .. slime.EvolutionStage .. " (" .. evolutionType .. ")")
+	
+	-- Check for Stage 5 achievement
+	if slime.EvolutionStage == 5 then
+		local DataService = Knit.GetService("DataService")
+		if DataService then
+			DataService:UnlockAchievement(player, "graduate_slime")
+		end
+	end
+	
+	return slime
+end
+
+-- Sacrifice a slime to boost another (SLIME-004)
+function SlimeFactory:SacrificeSlime(player: Player, targetInstanceId: string, sacrificeInstanceId: string): (SlimeInstance?, string?)
+	local inventory = playerSlimes[player]
+	if not inventory or not inventory[targetInstanceId] or not inventory[sacrificeInstanceId] then
+		return nil, "One or both slimes not found"
+	end
+	
+	local target = inventory[targetInstanceId]
+	local sacrifice = inventory[sacrificeInstanceId]
+	
+	-- Cannot sacrifice self
+	if targetInstanceId == sacrificeInstanceId then
+		return nil, "Cannot sacrifice self"
+	end
+	
+	-- Cannot sacrifice Level 5 slimes
+	if sacrifice.EvolutionStage >= 5 then
+		return nil, "Cannot sacrifice max level slimes"
+	end
+	
+	-- Add sacrifice info to target
+	target.SacrificeCount = target.SacrificeCount + 1
+	
+	-- Add sacrificed slime's stats to target (50% contribution)
+	local sacrificeStats = sacrifice.Stats
+	target.Stats.Logos = target.Stats.Logos + math.floor(sacrificeStats.Logos * 0.5)
+	target.Stats.Pathos = target.Stats.Pathos + math.floor(sacrificeStats.Pathos * 0.5)
+	target.Stats.Ethos = target.Stats.Ethos + math.floor(sacrificeStats.Ethos * 0.5)
+	target.Stats.Speed = target.Stats.Speed + math.floor(sacrificeStats.Speed * 0.5)
+	
+	-- Recalculate aggregated stats
+	target.AggregatedStats = calculateAggregatedStats(target.PhraseComponents, target.SacrificeCount)
+	
+	-- Remove sacrificed slime from inventory
+	playerSlimes[player][sacrificeInstanceId] = nil
+	
+	print("[SlimeFactory] Sacrificed " .. sacrifice.Term .. " to boost " .. target.Term)
+	
+	-- Achievement for triple sacrifice
+	if target.SacrificeCount >= 3 then
+		local DataService = Knit.GetService("DataService")
+		if DataService then
+			DataService:UnlockAchievement(player, "triple_sacrifice")
+		end
+	end
+	
+	return target
+end
+
+-- Get evolution stage info
+function SlimeFactory:GetEvolutionStageInfo(stage: number): { grade: string, name: string, minWords: number }?
+	for _, info in ipairs(GRADE_LEVEL_THRESHOLDS) do
+		if info.stage == stage then
+			return {
+				grade = info.grade,
+				name = EVOLUTION_STAGE_NAMES[stage] or "Unknown",
+				minWords = info.minWords,
+			}
+		end
+	end
+	return nil
+end
+
+-- Get phrase display name
+function SlimeFactory:GetPhraseDisplayName(instanceId: string, player: Player): string?
+	local inventory = playerSlimes[player]
+	if not inventory or not inventory[instanceId] then
+		return nil
+	end
+	
+	local slime = inventory[instanceId]
+	return slime.Term
+end
+
 
 
 -- Grant evolution point to player (for phase objectives)
@@ -686,5 +1090,50 @@ Players.PlayerRemoving:Connect(function(player)
 	-- Data is saved via DataService, just clean up reference
 	playerSlimes[player] = nil
 end)
+
+-- TRINITY CROSSOVER: The Ego Slime
+function SlimeFactory:CreateEgoSlime(player: Player, reflectionText: string): (SlimeInstance?, string?)
+	if not playerSlimes[player] then
+		playerSlimes[player] = {}
+	end
+	
+	-- We create a hyper-rare slime named after the Player, whose stats are based on the length/depth of their reflection
+	local stats = {
+		Logos = 100 + #reflectionText,
+		Pathos = 100 + (#reflectionText * 2),
+		Ethos = 100,
+		Speed = 50,
+	}
+	
+	local slime: SlimeInstance = {
+		InstanceId = HttpService:GenerateGUID(false),
+		WordId = player.UserId .. "_ego",
+		Term = player.Name .. " (Ego)",
+		Root = "Self",
+		Element = "Light",
+		Role = "Civilian",
+		Level = 5,
+		XP = 0,
+		EvolutionStage = 5,
+		Stats = stats,
+		ContextPoints = 100,
+		ContextHistory = {},
+		Rarity = "Mythic",
+		ImaginaryTrait = "Reflective",
+		SignatureMove = "Total Unification",
+		CreatedAt = os.time(),
+		PhraseComponents = {
+			{ InstanceId = "", Word = "ego", Term = player.Name, Role = "Civilian" }
+		},
+		AggregatedStats = nil,
+		SacrificeCount = 0,
+		EvolutionPath = { "Truth" },
+	}
+	
+	playerSlimes[player][slime.InstanceId] = slime
+	self.Client.SlimeCreated:Fire(player, slime)
+	print("[SlimeFactory] THE EGO SLIME HAS BEEN BORN FOR " .. player.Name)
+	return slime
+end
 
 return SlimeFactory

@@ -1,39 +1,32 @@
-# Project place file
-/roblox.rbxlx
-
-# Roblox Studio lock files
-/*.rbxlx.lock
-/*.rbxl.lock
-
-# Build artifacts - don't track these!
+# Roblox build artifacts
 *.rbxl
 *.rbxlx
-!/*.rbxl  # Uncomment if you need to track one specific file
+*.rbxm
+!semantic_slime_fresh.rbxl
 
-# Sourcemap (regenerated on build)
-sourcemap.json
+# Rojo/Wally
+Packages/
+wally.lock
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-.zed/
+# Toolchain
+.rokit/
+
+# Python (if any utility scripts are used)
+__pycache__/
+*.pyc
+venv*/
+*.egg-info/
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Secrets - NEVER commit these
-**/APIKeys*
-**/*Secret*
-**/*Token*
-.env
-.env.*
+# IDE
+.vscode/
+*.swp
+*.swo
 
-# Wally (keep lock for reproducibility)
-# wally.lock
-
-# Test builds
-test_*.rbxl
-test_*.rbxlx
+# Misc
+*.zip
+*.deb
+*.docx

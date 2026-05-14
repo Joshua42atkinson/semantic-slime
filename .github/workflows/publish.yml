@@ -1,0 +1,82 @@
+name: Build & Publish Semantic Slime
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish to Roblox after build'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rokit
+        run: |
+          curl -sSf https://raw.githubusercontent.com/rojo-rbx/rokit/main/scripts/install.sh | bash
+          echo "$HOME/.rokit/bin" >> $GITHUB_PATH
+
+      - name: Install tools
+        run: rokit install
+
+      - name: Install packages
+        run: wally install
+
+      - name: Lint (selene)
+        run: |
+          selene src/ 2>&1 | tail -5
+          # Don't fail on lint warnings, only on parse errors
+          PARSE_ERRORS=$(selene src/ 2>&1 | grep "parse errors" | grep -oP '^\d+' || echo "0")
+          if [ "$PARSE_ERRORS" -gt 0 ]; then
+            echo "::error::$PARSE_ERRORS parse errors found!"
+            exit 1
+          fi
+
+      - name: Build
+        run: rojo build -o semantic_slime_built.rbxl
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: semantic-slime-build
+          path: semantic_slime_built.rbxl
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event.inputs.publish == 'true' || github.ref == 'refs/heads/master'
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: semantic-slime-build
+
+      - name: Install Rokit + rbxcloud
+        run: |
+          curl -sSf https://raw.githubusercontent.com/rojo-rbx/rokit/main/scripts/install.sh | bash
+          echo "$HOME/.rokit/bin" >> $GITHUB_PATH
+          ~/.rokit/bin/rokit add Sleitnick/rbxcloud@0.17.0
+
+      - name: Publish to Roblox
+        env:
+          ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
+          ROBLOX_UNIVERSE_ID: ${{ secrets.ROBLOX_UNIVERSE_ID }}
+          ROBLOX_PLACE_ID: ${{ secrets.ROBLOX_PLACE_ID }}
+        run: |
+          if [ -z "$ROBLOX_API_KEY" ] || [ -z "$ROBLOX_UNIVERSE_ID" ] || [ -z "$ROBLOX_PLACE_ID" ]; then
+            echo "::warning::Missing Roblox credentials. Set ROBLOX_API_KEY, ROBLOX_UNIVERSE_ID, and ROBLOX_PLACE_ID as repository secrets."
+            exit 1
+          fi
+          rbxcloud experience publish \
+            --filename semantic_slime_built.rbxl \
+            --universe-id "$ROBLOX_UNIVERSE_ID" \
+            --place-id "$ROBLOX_PLACE_ID" \
+            --api-key "$ROBLOX_API_KEY" \
+            --version-type Published

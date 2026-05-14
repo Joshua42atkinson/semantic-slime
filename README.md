@@ -1,167 +1,147 @@
-# Semantic Slime (The Phoenix Project)
+# 🧪 Semantic Slime
 
-> *An MMO-Lit-RPG where language is living matter*
+> **An educational MMO-RPG where words become living creatures.**
 
-## Overview
+Semantic Slime is a Roblox game where players explore **Syllable Springs** — a world built from Jungian archetypes — to catch **Etymons** (word-slimes). Each slime is born from real etymology: its root determines its element, its suffix determines its combat role. Players collect letter crystals, build words, and use their slimes to solve Mad-Lib quests and battle for meaning.
 
-**Semantic Slime** is an educational Roblox game that teaches vocabulary through engaging gameplay. Players explore **Psyche-Polis**, a town manifesting Jungian psychology, to catch **Etymons** (Semantic Slimes). Each slime represents a word part (Root or Suffix) with elemental properties. Players combine these slimes to craft complex "Words of Power" to solve Mad-Libs style quests and battle obstacles.
+**Platform:** Roblox (PC/Mobile)  
+**Target Audience:** Ages 12–18  
+**Framework:** [Knit](https://sleitnick.github.io/Knit/)  
+**Sync:** [Rojo](https://rojo.space/) 7.6.1  
 
-## Core Game Loop
+---
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         MAIN GAME LOOP                                  │
-│                                                                         │
-│  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐         │
-│  │ COLLECT  │───▶│ CONSTRUCT│───▶│  QUEST   │───▶│  BATTLE  │         │
-│  │ LETTERS  │    │   WORD   │    │   MAD    │    │  FOR     │         │
-│  │ CRYSTALS │    │  SLIMES  │    │   LIBS   │    │  SLOTS   │         │
-│  └──────────┘    └──────────┘    └──────────┘    └──────────┘         │
-│       ▲                                                   │             │
-│       │              EVOLUTION & MEANING                  │             │
-│       └──────────────────────────────────────────────────┘             │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-### 1. Collection Phase
-- Explore the world to collect **Letter Crystals** (A-Z)
-- Rarer letters (Q, X, Z, J) have higher rarity and glow intensity
-- Crystals spawn as physical 3D objects with glow effects
-
-### 2. Construction Phase
-- Combine letters to spell words in the **Word Constructor**
-- Valid words create new **Slimes** with:
-  - **Element** (from Root): Fire, Water, Earth, Air, Shadow, Light
-  - **Role** (from Suffix): Tank, Striker, Support, Caster, Assassin
-  - **Rarity**: Common → Mythic (with gacha-style chances)
-
-### 3. Quest Phase
-- Talk to **Archetypal NPCs** (Hero, Mentor, Trickster, Shadow, Herald)
-- Complete **Mad Lib quests** by filling slots with your slimes
-- Earn XP, Insight, and Evolution Points
-
-### 4. Battle Phase
-- When multiple players want the same quest slot, **battle!**
-- Turn-based combat using slime stats (Logos, Pathos, Ethos, Speed)
-- Winner fills the slot and gains Context Points
-
-## Project Structure
+## 🎮 Core Game Loop
 
 ```
-src/
-├── client/
-│   ├── Boot.client.luau       # Client initialization
-│   ├── Controllers/           # Knit controllers
-│   │   ├── GameLoopController.lua    # Phase management
-│   │   ├── HUDController.lua         # Main HUD
-│   │   ├── SlimeController.lua       # Slime visuals
-│   │   ├── WordConstructorController.lua
-│   │   └── ...
-│   └── UI/
-│       ├── BattleUI.lua       # Battle interface
-│       ├── DialogueUI.lua     # NPC dialogue
-│       ├── LureUI.lua         # Capture minigame
-│       ├── QuestLog.lua       # Quest tracker
-│       ├── SlimeCollectionUI.lua
-│       └── StoreUI.lua
-├── server/
-│   ├── Boot.server.luau       # Server initialization
-│   ├── Services/              # Knit services
-│   │   ├── GameLoopService.lua    # Game loop orchestration
-│   │   ├── CrystalService.lua     # Letter crystal spawning
-│   │   ├── SlimeFactory.lua       # Slime creation/evolution
-│   │   ├── MadLibService.lua      # Quest generation
-│   │   ├── BattleService.lua      # Combat system
-│   │   ├── GachaService.lua       # AI-generated slimes
-│   │   ├── DataService.lua        # Data persistence
-│   │   ├── TownGenerator.lua      # Procedural map
-│   │   └── ...
-│   └── Scripts/
-│       ├── LightingManager.server.luau
-│       └── WordItemScript.server.luau
-└── shared/
-    ├── GameConfig.lua         # Central configuration
-    ├── EtymologyDB.lua        # Root/Suffix database
-    ├── SynonymDatabase.lua    # Lure minigame data
-    ├── WordDatabase.lua       # Valid words
-    ├── NPCData.lua            # NPC definitions
-    └── TownBlueprint.lua      # Map layout
+COLLECT letter crystals → BUILD words → CATCH slimes → QUEST with Mad-Libs → BATTLE for slots
+         ↑                                                                         │
+         └─────────────────── EVOLVE & MASTER ─────────────────────────────────────┘
 ```
 
-## Key Systems
+### Phases
+1. **Collection** — Explore districts, gather A–Z crystals (rarity: common → mythic)
+2. **Construction** — Spell words in the Word Constructor; valid words spawn Etymon slimes
+3. **Quest** — Talk to archetypal NPCs, fill Mad-Lib slots with your slimes
+4. **Battle** — Turn-based PvP when players compete for the same quest slot
+5. **Rewards** — XP, Insight currency, Evolution Points
 
-### The Logos Engine (Etymon System)
-Words are analyzed and transformed into creatures:
-- **Root** determines Element (Ignis → Fire, Aqua → Water, etc.)
-- **Suffix** determines Role (-tion → Tank, -ize → Striker, etc.)
-- **Stats** are calculated from: Base + RootBonus + SuffixBonus × LevelMultiplier
+---
 
-### Evolution System
-- Slimes level up through quest usage
-- At Level 10, can evolve with Insight currency
-- Evolution stages: Normal → Greater → Ascended → Divine → Cosmic
-- Modifiers (ed, ing, er, etc.) add stat bonuses
+## 📁 Project Structure
 
-### Gacha System
-- AI-generated "imaginary" slimes with unique traits
-- Rarity-based stat multipliers
-- Signature moves and flavor text
+```
+semantic-slime/
+├── src/
+│   ├── client/
+│   │   ├── Boot.client.luau       # Client entry point
+│   │   ├── Controllers/           # 21 Knit controllers
+│   │   ├── UI/                    # 14 UI modules
+│   │   └── VisualFeedback/        # Effect systems
+│   ├── server/
+│   │   ├── Boot.server.luau       # Server entry point
+│   │   ├── Services/              # 36 Knit services
+│   │   └── Scripts/               # Standalone server scripts
+│   └── shared/
+│       ├── GameConfig.lua         # Central configuration
+│       ├── EtymologyDB.lua        # Root/suffix → element/role mapping
+│       ├── WordDatabase.lua       # Valid word list (~956KB)
+│       ├── SynonymDatabase.lua    # Synonym/antonym data
+│       ├── NPCData.lua            # NPC definitions (12 characters)
+│       ├── TownBlueprint.lua      # Procedural map layout
+│       ├── Remotes.luau           # RemoteEvent/Function creation
+│       └── Data/Master_Lore/      # Character lore (12 NPCs)
+├── docs/
+│   ├── 01-project/                # Architecture, changelog, setup
+│   ├── 02-design/                 # Design doc, mechanics, lore, backlog
+│   ├── 03-technical/              # Technical bible
+│   ├── 04-specs/                  # Feature specifications
+│   ├── 05-pedagogy/               # Educational theory & lessons learned
+│   ├── 06-workflows/              # Roadmap
+│   └── 07-testing/                # Bug tracker
+├── scripts/                       # Rojo health checks, service files
+├── default.project.json           # Rojo project config
+├── wally.toml                     # Package dependencies (Knit, Promise)
+├── rokit.toml                     # Toolchain versions
+├── selene.toml                    # Linter config
+├── stylua.toml                    # Formatter config
+└── semantic_slime_fresh.rbxl      # Latest Studio build
+```
 
-## Development Setup
+---
+
+## 🚀 Getting Started
 
 ### Prerequisites
-- [Rojo](https://rojo.space/) for syncing with Roblox Studio
-- [Wally](https://wally.run/) for package management
+- [Roblox Studio](https://create.roblox.com/)
+- [Rokit](https://github.com/rojo-rbx/rokit) (installs Rojo + Wally)
 
-### Installation
+### Setup
 ```bash
-# Install dependencies
+# Install toolchain
+rokit install
+
+# Install packages
 wally install
 
 # Start Rojo sync
 rojo serve default.project.json
 ```
 
-### In Roblox Studio
+Then in Roblox Studio:
 1. Install the Rojo plugin
-2. Connect to the Rojo server (default: localhost:34872)
-3. The game will sync automatically
+2. Connect to `localhost:34872`
+3. Press **Play** — the world generates procedurally
 
-## Controls
+---
+
+## 🎯 Current Status: Alpha
+
+The core systems exist but need integration testing and polish. See [ROADMAP.md](docs/06-workflows/ROADMAP.md) for the path to playable.
+
+### What Works
+- ✅ Knit service/controller architecture (36 services, 21 controllers)
+- ✅ Procedural town generation (7 Jungian districts)
+- ✅ 12 archetypal NPCs with lore and dialogue
+- ✅ Word construction pipeline (EtymologyDB → SlimeFactory)
+- ✅ Game loop phase management
+- ✅ Boot sequence with error recovery
+
+### What Needs Work
+- 🔧 End-to-end playtest (no verified full-loop playthrough yet)
+- 🔧 Data quality audit (SynonymDB, WordDB, QuestData)
+- 🔧 UI polish and mobile responsiveness
+- 🔧 Sound/music integration verification
+- 🔧 Performance profiling
+
+---
+
+## ⌨️ Controls
 
 | Key | Action |
 |-----|--------|
-| I | Open Slime Collection |
-| J | Toggle Quest Log |
-| K | Open Word Constructor |
-| E | Interact with NPC |
-| Click | Select/Lure Slime |
+| **E** | Interact with NPC |
+| **I** | Slime Collection |
+| **J** | Quest Log |
+| **K** | Word Constructor |
+| **Click** | Select / Lure Slime |
 
-## Configuration
+---
 
-Edit `src/shared/GameConfig.lua` to adjust:
-- Phase durations
-- Evolution costs
-- Element colors and emojis
-- UI color scheme
+## 📚 Key Documentation
 
-## Documentation
+| Doc | Purpose |
+|-----|---------|
+| [Architecture](docs/01-project/ARCHITECTURE.md) | System diagram, boot sequence, dependencies |
+| [Design Document](docs/02-design/DESIGN_DOCUMENT.md) | Full game design |
+| [Lore Bible](docs/02-design/LORE_BIBLE.md) | World and character lore |
+| [Game Mechanics](docs/02-design/GAME_MECHANICS.md) | Technical mechanics detail |
+| [Roadmap](docs/06-workflows/ROADMAP.md) | Sprint plan to launch |
+| [Bug Tracker](docs/07-testing/BUG_TRACKER.md) | Known issues and fixes |
+| [Lessons Learned](docs/05-pedagogy/LESSONS_LEARNED.md) | Technical gotchas |
 
-See `docs/` for detailed specifications:
-- `context.md` - Project overview
-- `game_mechanics.md` - Technical mechanics
-- `specs/001_game_manager.md` - Game state management
-- `specs/002_town_quest_system.md` - Quest system
-- `specs/003_logos_engine.md` - Etymon system
-- `specs/004_town_layout.md` - Map generation
-- `specs/005_integrated_game_loop.md` - Complete game loop
+---
 
-## Credits
+## 📄 License
 
-Built with:
-- [Knit](https://sleitnick.github.io/Knit/) - Roblox framework
-- [Promise](https://github.com/evaera/promise.lua) - Promise implementation
-
-## License
-
-MIT License - See LICENSE file for details
+MIT

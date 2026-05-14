@@ -1,4 +1,7 @@
 --!strict
+--==============================================================
+-- MMMM Context: Orchestrates the timed or event-driven appearances of entities in the world, maintaining map rhythm.
+--==============================================================
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
@@ -7,6 +10,7 @@ local CollectionService = game:GetService("CollectionService")
 
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Knit = require(Packages:WaitForChild("Knit"))
+local Blueprint = require(ReplicatedStorage.Shared.TownBlueprint)
 
 local SynonymDatabase = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("SynonymDatabase"))
 local GameConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("GameConfig"))
@@ -31,12 +35,13 @@ local slimes: { [string]: any } = {} -- [id] = {Position, Term, Element, Model}
 local lastSpawn = 0
 local slimeRemotes: Folder? = nil
 
--- District spawn zones (based on TownBlueprint)
+-- District spawn zones — centers match TownBlueprint.Settings.OffsetFromCenter
+local offset = Blueprint.Settings.OffsetFromCenter
 local DISTRICT_ZONES = {
-	Logos = { Center = Vector3.new(0, 0, -350), Radius = 200, Element = "Air" },
-	Eros = { Center = Vector3.new(0, 0, 350), Radius = 200, Element = "Water" },
-	Pneuma = { Center = Vector3.new(350, 0, 0), Radius = 200, Element = "Light" },
-	Soma = { Center = Vector3.new(-350, 0, 0), Radius = 200, Element = "Fire" },
+	BrainyBorough = { Center = Blueprint.Districts.BrainyBorough.Direction * offset, RadiusMin = 40, RadiusMax = 400, Element = "Air", Words = {"ancient", "logic", "brilliant", "precise", "knowledge", "archive", "scholar", "wisdom", "clarity"} },
+	HeartwoodGrove  = { Center = Blueprint.Districts.HeartwoodGrove.Direction * offset,  RadiusMin = 40, RadiusMax = 400, Element = "Earth", Words = {"vibrant", "nature", "flourish", "blossom", "tender", "verdant", "gentle", "serene", "harvest"} },
+	WhisperWinds= { Center = Blueprint.Districts.WhisperWinds.Direction * offset,  RadiusMin = 40, RadiusMax = 400, Element = "Light", Words = {"radiant", "ethereal", "dream", "spirit", "luminous", "ascend", "celestial", "vision", "inspire"} },
+	ActionAlley  = { Center = Blueprint.Districts.ActionAlley.Direction * offset, RadiusMin = 40, RadiusMax = 400, Element = "Fire",  Words = {"blazing", "fierce", "ignite", "smolder", "ember", "furious", "combust", "volatile", "sear"} },
 }
 
 function SpawnerService:KnitStart()
@@ -92,44 +97,47 @@ function SpawnerService:GetSlimesInRadius(position: Vector3, radius: number): { 
 end
 
 function SpawnerService:SpawnOne(element: string?)
-    -- Pick random position in wilderness ring
-    local angle = math.random() * math.pi * 2
-    local dist = math.random(SPAWN_RADIUS_INNER, SPAWN_RADIUS_OUTER)
-    
-    local x = math.cos(angle) * dist
-    local z = math.sin(angle) * dist
-    
-    -- Determine element based on position (district influence)
-    if not element then
-        local pos = Vector3.new(x, 0, z)
-        local closestDistrict = nil
-        local closestDist = math.huge
-        
-        for district, zone in pairs(DISTRICT_ZONES) do
-            local d = (pos - zone.Center).Magnitude
-            if d < closestDist then
-                closestDist = d
-                closestDistrict = district
-            end
-        end
-        
-        if closestDistrict and math.random() < 0.6 then
-            element = DISTRICT_ZONES[closestDistrict].Element
-        else
-            -- Random element
-            local elements = {"Fire", "Water", "Earth", "Air", "Shadow", "Light"}
-            element = elements[math.random(1, #elements)]
-        end
-    end
-    
-    -- Get random word from SynonymDatabase
-    local term = SynonymDatabase.GetRandomWord(element)
-    local wordElement = SynonymDatabase.GetElement(term) or element or "Normal"
-    
-    local id = HttpService:GenerateGUID(false)
-    local position = Vector3.new(x, SPAWN_Y, z)
-    
-    self:CreateSlime(id, term, position, wordElement)
+	-- Pick a random district to spawn in
+	local districtNames = { "BrainyBorough", "HeartwoodGrove", "WhisperWinds", "ActionAlley" }
+	local district = DISTRICT_ZONES[districtNames[math.random(1, #districtNames)]]
+
+	-- If a specific element was requested, find the matching district
+	if element then
+		for _, zone in pairs(DISTRICT_ZONES) do
+			if zone.Element == element then
+				district = zone
+				break
+			end
+		end
+	end
+
+	-- Random point inside the district city pad
+	local angle = math.random() * math.pi * 2
+	local radius = math.random(district.RadiusMin, district.RadiusMax)
+	local offsetX = math.cos(angle) * radius
+	local offsetZ = math.sin(angle) * radius
+
+	local position = Vector3.new(
+		district.Center.X + offsetX,
+		district.Center.Y,
+		district.Center.Z + offsetZ
+	)
+
+	-- Pick a word: 70% chance district vocabulary, 30% chance SynonymDatabase
+	local term
+	if math.random() < 0.7 and #district.Words > 0 then
+		term = district.Words[math.random(1, #district.Words)]
+	else
+		local ok, result = pcall(function()
+			return SynonymDatabase.GetRandomWord(district.Element)
+		end)
+		term = (ok and result) or district.Words[1]
+	end
+
+	local wordElement = district.Element
+
+	local id = HttpService:GenerateGUID(false)
+	self:CreateSlime(id, term, position, wordElement)
 end
 
 function SpawnerService:CreateSlime(id: string, term: string, pos: Vector3, element: string)

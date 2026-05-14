@@ -22,8 +22,10 @@ local DataService = Knit.CreateService {
 
 -- Config
 local DATA_VERSION = "v3" -- Bumped for Full Schema
-local playerDataStore = DataStoreService:GetDataStore("LexicalLegendsData_" .. DATA_VERSION)
+local playerDataStore = nil -- initialized in KnitStart
 local AUTO_SAVE_INTERVAL = 300 -- 5 minutes
+local MAX_PLAYER_LEVEL = 50 -- [PLAYER-002]
+local XP_BASE = 500
 
 -- Cache
 local sessionData = {}
@@ -64,10 +66,24 @@ local DEFAULT_DATA = {
     Settings = {
         MusicVolume = 0.5,
         SFXVolume = 0.5
-    }
+    },
+    LinguisticLog = {
+        Morphemes = {}, -- { [Morpheme]: { Pass = number, Fail = number } }
+        Breadcrumbs = {}, -- { [Morpheme]: { last_used = number, mistakes = number } }
+    },
 }
 
 function DataService:KnitStart()
+    -- Initialize DataStore (pcall for unpublished places)
+    local ok, store = pcall(function()
+        return DataStoreService:GetDataStore("LexicalLegendsData_" .. DATA_VERSION)
+    end)
+    if ok then
+        playerDataStore = store
+    else
+        warn("[DataService] DataStore unavailable (publish place to enable): " .. tostring(store))
+    end
+    
     print("[DataService] Started.")
     
     -- Event Listeners
@@ -130,31 +146,26 @@ function DataService:_LoadData(player: Player)
         sessionData[player] = deepCopy(DEFAULT_DATA) -- Fallback
     end
     
-    -- Hydrate LogosService safely
-    -- We use Knit.GetService here to avoid cyclic requires at module level
-    local LogosService = Knit.GetService("LogosService")
-    if LogosService and data.Inventory then
-        LogosService:LoadInventory(player, data.Inventory)
-    end
-    
-    -- Hydrate SlimeFactory
-    local SlimeFactory = Knit.GetService("SlimeFactory")
-    if SlimeFactory and data.Slimes then
-        SlimeFactory:LoadPlayerSlimes(player, data.Slimes)
-    end
-    
-    -- Hydrate CrystalService
-    local CrystalService = Knit.GetService("CrystalService")
-    if CrystalService and data.LetterInventory then
-        -- CrystalService handles its own inventory, but we can set it
-        -- For now, the starter letters are given in CrystalService.PlayerAdded
-    end
-    
-    -- Hydrate GachaService
-    local GachaService = Knit.GetService("GachaService")
-    if GachaService and data.GachaCollection then
-        GachaService:LoadPlayerGachaData(player, data.GachaCollection)
-    end
+    -- Hydrate other services safely (deferred to avoid circular dependency issues at boot)
+    task.defer(function()
+        -- Hydrate LogosService
+        local logosOk, LogosService = pcall(function() return Knit.GetService("LogosService") end)
+        if logosOk and LogosService and data and data.Inventory then
+            pcall(function() LogosService:LoadInventory(player, data.Inventory) end)
+        end
+        
+        -- Hydrate SlimeFactory
+        local slimeOk, SlimeFactory = pcall(function() return Knit.GetService("SlimeFactory") end)
+        if slimeOk and SlimeFactory and data and data.Slimes then
+            pcall(function() SlimeFactory:LoadPlayerSlimes(player, data.Slimes) end)
+        end
+        
+        -- Hydrate WordExcavatorService
+        local excavatorOk, WordExcavatorService = pcall(function() return Knit.GetService("WordExcavatorService") end)
+        if excavatorOk and WordExcavatorService and data and data.GachaCollection then
+            pcall(function() WordExcavatorService:LoadPlayerGachaData(player, data.GachaCollection) end)
+        end
+    end)
     
     -- Notify Client
     self.Client.DataLoaded:Fire(player, sessionData[player])
@@ -180,9 +191,25 @@ function DataService:_SaveData(player: Player)
     if not data then return end
     
     -- Gather latest state from other services if they hold authority
-    local LogosService = Knit.GetService("LogosService")
-    if LogosService then
-        data.Inventory = LogosService:GetInventory(player)
+    local logosOk, LogosService = pcall(function() return Knit.GetService("LogosService") end)
+    if logosOk and LogosService then
+        pcall(function()
+            data.Inventory = LogosService:GetInventory(player)
+        end)
+    end
+    
+    local slimeOk, SlimeFactory = pcall(function() return Knit.GetService("SlimeFactory") end)
+    if slimeOk and SlimeFactory then
+        pcall(function()
+            local currentSlimes = SlimeFactory:GetPlayerSlimes(player)
+            if currentSlimes then
+                data.Slimes = currentSlimes
+            end
+            local companion = SlimeFactory:GetCompanion(player)
+            if companion then
+                data.CompanionSlimeId = companion.InstanceId
+            end
+        end)
     end
     
     local key = "Player_" .. player.UserId
@@ -262,6 +289,96 @@ end
 
 function DataService:UnlockAchievement(player: Player, achievementId: string)
     self:IncrementAchievementProgress(player, achievementId, 1)
+end
+
+function DataService:AddXP(player: Player, amount: number)
+	local profile = self:GetProfile(player)
+	if not profile then return end
+	
+	profile.XP = (profile.XP or 0) + amount
+	
+	-- Calculate level
+	local currentLevel = profile.Level or 1
+	if currentLevel >= MAX_PLAYER_LEVEL then
+		profile.Level = MAX_PLAYER_LEVEL
+		profile.XP = 0
+		return
+	end
+	
+	-- Scaling XP Needed: Base * Level
+	local xpNeeded = currentLevel * XP_BASE
+	while profile.XP >= xpNeeded and currentLevel < MAX_PLAYER_LEVEL do
+		profile.XP -= xpNeeded
+		currentLevel += 1
+		xpNeeded = currentLevel * XP_BASE
+		
+		print("[DataService] " .. player.Name .. " LEVELED UP to " .. currentLevel)
+		-- Notify client of Level Up
+		self.Client.DataUpdated:Fire(player, "LevelUp", currentLevel)
+	end
+	
+	profile.Level = currentLevel
+	self.Client.DataUpdated:Fire(player, "Level", profile.Level)
+	self.Client.DataUpdated:Fire(player, "XP", profile.XP)
+end
+
+function DataService:AddInsight(player: Player, amount: number)
+	local profile = self:GetProfile(player)
+	if not profile then return end
+	
+	profile.Stats.Insight = (profile.Stats.Insight or 0) + amount
+	self.Client.DataUpdated:Fire(player, "Stats", profile.Stats)
+end
+
+function DataService:LogLinguisticData(player: Player, morpheme: string, success: boolean)
+    local profile = self:GetProfile(player)
+    if not profile then return end
+    
+    if not profile.LinguisticLog then
+        profile.LinguisticLog = { Morphemes = {}, Breadcrumbs = {} }
+    end
+    
+    local log = profile.LinguisticLog
+    if not log.Morphemes[morpheme] then
+        log.Morphemes[morpheme] = { Pass = 0, Fail = 0 }
+    end
+    
+    if success then
+        log.Morphemes[morpheme].Pass += 1
+    else
+        log.Morphemes[morpheme].Fail += 1
+        
+        -- Update Breadcrumbs for targeted review
+        if not log.Breadcrumbs[morpheme] then
+            log.Breadcrumbs[morpheme] = { last_used = os.time(), mistakes = 0 }
+        end
+        log.Breadcrumbs[morpheme].mistakes += 1
+        log.Breadcrumbs[morpheme].last_used = os.time()
+    end
+    
+    self.Client.DataUpdated:Fire(player, "LinguisticLog", log)
+end
+
+-- Bonus methods used by GameLoopService objective system
+function DataService:GrantRerollToken(player: Player)
+    local profile = self:GetProfile(player)
+    if not profile then return end
+    profile.RerollTokens = (profile.RerollTokens or 0) + 1
+    print("[DataService] Granted reroll token to " .. player.Name)
+end
+
+function DataService:GrantBattleSkip(player: Player)
+    local profile = self:GetProfile(player)
+    if not profile then return end
+    profile.BattleSkip = true
+    print("[DataService] Granted battle skip to " .. player.Name)
+end
+
+function DataService:GrantDoubleRewards(player: Player)
+    local profile = self:GetProfile(player)
+    if not profile then return end
+    profile.DoubleRewards = true
+    print("[DataService] Granted double rewards to " .. player.Name)
 end
 
 return DataService

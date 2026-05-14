@@ -1,4 +1,7 @@
 --!strict
+--==============================================================
+-- MMMM Context: The core isomorphism engine. Calculates physical stats from linguistic morphology, binding word meaning to mechanical power.
+--==============================================================
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local HttpService = game:GetService("HttpService")

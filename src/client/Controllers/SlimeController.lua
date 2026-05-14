@@ -1,4 +1,7 @@
 --!strict
+--==============================================================
+-- MMMM Context: Renders the physical and animated state of Slimes. Bridges backend linguistic stats with frontend visual representation.
+--==============================================================
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -9,6 +12,10 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Knit = require(Packages:WaitForChild("Knit"))
 local SynonymDatabase = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("SynonymDatabase"))
 local GameConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("GameConfig"))
+local SlimeVisuals = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("SlimeVisuals"))
+
+local ELEMENT_COLORS = SlimeVisuals.ELEMENT_COLORS
+
 
 local SlimeController = Knit.CreateController { Name = "SlimeController" }
 
@@ -35,75 +42,147 @@ type SlimeData = {
 	VFX: any?,
 }
 
--- Element Colors
-local ELEMENT_COLORS: { [string]: Color3 } = {
-	Fire = Color3.fromRGB(255, 100, 50),
-	Water = Color3.fromRGB(50, 150, 255),
-	Earth = Color3.fromRGB(139, 90, 43),
-	Air = Color3.fromRGB(200, 200, 255),
-	Shadow = Color3.fromRGB(100, 50, 150),
-	Light = Color3.fromRGB(255, 220, 100),
-	Normal = Color3.fromRGB(180, 180, 180),
-}
 
--- Create VFX for a slime
+-- Create rich per-element VFX for a slime
 local function createSlimeVFX(root: Part, element: string): any
-	local vfx = {
-		particles = nil,
-		trail = nil,
-		light = nil,
+	local color = ELEMENT_COLORS[element] or ELEMENT_COLORS.Normal
+	local vfx = { particles = nil, light = nil, trail = nil }
+
+	-- Two attachment points for Trail
+	local att0 = Instance.new("Attachment")
+	att0.Name = "FXTop"
+	att0.Position = Vector3.new(0, 1.4, 0)
+	att0.Parent = root
+
+	local att1 = Instance.new("Attachment")
+	att1.Name = "FXBot"
+	att1.Position = Vector3.new(0, -1.4, 0)
+	att1.Parent = root
+
+	-- Per-element particles
+	local p = Instance.new("ParticleEmitter")
+	p.Name = "SlimeParticles"
+	p.Lifetime = NumberRange.new(0.6, 1.4)
+	p.SpreadAngle = Vector2.new(60, 60)
+	p.LightEmission = 0.5
+	p.LightInfluence = 0.5
+	p.RotSpeed = NumberRange.new(-45, 45)
+	p.Rotation = NumberRange.new(-180, 180)
+
+	if element == "Fire" then
+		p.Texture = "rbxasset://textures/particles/fire_main.dds"
+		p.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 220, 60)),
+			ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 80, 0)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 20, 0)),
+		})
+		p.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.8), NumberSequenceKeypoint.new(0.5, 1.2), NumberSequenceKeypoint.new(1, 0) })
+		p.Rate = 22
+		p.Speed = NumberRange.new(3, 7)
+		p.Acceleration = Vector3.new(0, 6, 0)
+		p.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.1), NumberSequenceKeypoint.new(1, 1) })
+		p.LightEmission = 1.0
+
+	elseif element == "Water" then
+		p.Color = ColorSequence.new(Color3.fromRGB(100, 180, 255))
+		p.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(0.7, 0.5), NumberSequenceKeypoint.new(1, 0) })
+		p.Rate = 6
+		p.Speed = NumberRange.new(1, 3)
+		p.Acceleration = Vector3.new(0, 4, 0)
+		p.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 1) })
+
+	elseif element == "Air" then
+		p.Texture = "rbxasset://textures/particles/smoke_main.dds"
+		p.Color = ColorSequence.new(Color3.new(1, 1, 1))
+		p.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 2.0) })
+		p.Rate = 4
+		p.Speed = NumberRange.new(0.5, 2)
+		p.Acceleration = Vector3.new(0, 1, 0)
+		p.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.7), NumberSequenceKeypoint.new(1, 1) })
+		p.LightInfluence = 1.0
+
+	elseif element == "Earth" then
+		p.Texture = "rbxasset://textures/particles/smoke_main.dds"
+		p.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(100, 180, 80)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 100, 40)),
+		})
+		p.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.4), NumberSequenceKeypoint.new(1, 0) })
+		p.Rate = 5
+		p.Speed = NumberRange.new(0.5, 1.5)
+		p.Acceleration = Vector3.new(0, -3, 0)
+		p.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.4), NumberSequenceKeypoint.new(1, 1) })
+
+	elseif element == "Shadow" then
+		p.Texture = "rbxasset://textures/particles/smoke_main.dds"
+		p.Color = ColorSequence.new(Color3.fromRGB(80, 20, 120))
+		p.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(0.5, 1.5), NumberSequenceKeypoint.new(1, 0) })
+		p.Rate = 12
+		p.Speed = NumberRange.new(1, 3)
+		p.Acceleration = Vector3.new(0, -2, 0)
+		p.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.6), NumberSequenceKeypoint.new(1, 1) })
+		p.LightEmission = 0.0
+		p.LightInfluence = 0.0
+
+	elseif element == "Light" then
+		p.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+		p.Color = ColorSequence.new(Color3.fromRGB(255, 245, 180))
+		p.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(0.3, 1.0), NumberSequenceKeypoint.new(1, 0) })
+		p.Rate = 18
+		p.Speed = NumberRange.new(2, 5)
+		p.Acceleration = Vector3.new(0, 2, 0)
+		p.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1) })
+		p.SpreadAngle = Vector2.new(180, 180)
+		p.LightEmission = 1.0
+
+	else
+		p.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+		p.Color = ColorSequence.new(color)
+		p.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.4), NumberSequenceKeypoint.new(1, 0) })
+		p.Rate = 6
+		p.Speed = NumberRange.new(1, 2)
+	end
+	p.Parent = root
+	vfx.particles = p
+
+	-- Point light tuned per element
+	local lightCfg = {
+		Fire   = { Color = Color3.fromRGB(255, 140, 30),  Brightness = 2.5, Range = 20 },
+		Water  = { Color = Color3.fromRGB(80, 160, 255),  Brightness = 1.0, Range = 14 },
+		Air    = { Color = Color3.fromRGB(200, 220, 255),  Brightness = 0.6, Range = 12 },
+		Earth  = { Color = Color3.fromRGB(80, 160, 60),   Brightness = 0.8, Range = 14 },
+		Shadow = { Color = Color3.fromRGB(100, 20, 180),  Brightness = 0.4, Range = 10 },
+		Light  = { Color = Color3.fromRGB(255, 250, 180),  Brightness = 3.5, Range = 24 },
+		Normal = { Color = Color3.fromRGB(200, 220, 200),  Brightness = 0.8, Range = 14 },
 	}
-	
-	-- Particle Emitter
-	local attachment = Instance.new("Attachment")
-	attachment.Name = "ParticleAttach"
-	attachment.Parent = root
-	
-	local particles = Instance.new("ParticleEmitter")
-	particles.Name = "SlimeParticles"
-	particles.Rate = 10
-	particles.Lifetime = NumberRange.new(0.5, 1)
-	particles.Speed = NumberRange.new(1, 3)
-	particles.Size = NumberSequence.new(0.5, 0)
-	particles.Color = ColorSequence.new(root.Color)
-	particles.Transparency = NumberSequence.new(0.5, 1)
-	particles.SpreadAngle = Vector2.new(180, 180)
-	particles.Parent = attachment
-	vfx.particles = particles
-	
-	-- Point Light
+	local lc = lightCfg[element] or lightCfg.Normal
 	local light = Instance.new("PointLight")
 	light.Name = "SlimeGlow"
-	light.Color = root.Color
-	light.Brightness = 1
-	light.Range = 15
+	light.Color = lc.Color
+	light.Brightness = lc.Brightness
+	light.Range = lc.Range
 	light.Parent = root
 	vfx.light = light
-	
-	-- Element-specific VFX
-	if element == "Fire" then
-		-- Fire flicker
-		particles.Texture = "rbxasset://textures/particles/fire_main.dds"
-		particles.Rate = 20
-		light.Brightness = 2
-	elseif element == "Water" then
-		-- Bubble effect
-		particles.Size = NumberSequence.new(0.3, 0.8, 0)
-		particles.Rate = 5
-	elseif element == "Shadow" then
-		-- Dark mist
-		particles.Transparency = NumberSequence.new(0.8, 1)
-		particles.Rate = 15
-		light.Brightness = 0.5
-	elseif element == "Light" then
-		-- Sparkles
-		particles.Texture = "rbxasset://textures/particles/sparkles_main.dds"
-		particles.Rate = 15
-		light.Brightness = 3
-	end
-	
+
+	-- Motion trail (enabled only during Fleeing state)
+	local trail = Instance.new("Trail")
+	trail.Attachment0 = att0
+	trail.Attachment1 = att1
+	trail.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, color),
+		ColorSequenceKeypoint.new(1, color:Lerp(Color3.new(1, 1, 1), 0.5)),
+	})
+	trail.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 1) })
+	trail.Lifetime = 0.3
+	trail.MinLength = 0.05
+	trail.Enabled = false
+	trail.LightEmission = 0.6
+	trail.Parent = root
+	vfx.trail = trail
+
 	return vfx
 end
+
 
 -- Create capture effect
 local function createCaptureEffect(position: Vector3, success: boolean)
@@ -244,6 +323,10 @@ function SlimeController:KnitStart()
 	print("[SlimeController] Started. Ready to jiggle.")
 end
 
+
+local SlimeVisuals = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("SlimeVisuals"))
+local ELEMENT_COLORS = SlimeVisuals.ELEMENT_COLORS
+
 function SlimeController:SpawnSlime(id: string, term: string, position: Vector3, element: string)
 	if slimes[id] then return end -- Already exists
 	
@@ -251,98 +334,51 @@ function SlimeController:SpawnSlime(id: string, term: string, position: Vector3,
 	local model = Instance.new("Model")
 	model.Name = "Slime_" .. term
 	
-	-- Main body (squishy sphere)
-	local part = Instance.new("Part")
-	part.Name = "RootPart"
-	part.Size = Vector3.new(3, 3, 3)
-	part.Shape = Enum.PartType.Ball
-	part.Material = Enum.Material.Neon
-	part.Position = position
-	part.Anchored = true
-	part.CanCollide = false
-	part.Parent = model
+	-- Build structure using shared visuals
+	local root = SlimeVisuals.BuildStructure(model, term, element)
+	model:SetPrimaryPartCFrame(CFrame.new(position))
 	
-	-- Color based on Element
-	part.Color = ELEMENT_COLORS[element] or ELEMENT_COLORS.Normal
-	
-	-- Inner core (darker shade)
-	local core = Instance.new("Part")
-	core.Name = "Core"
-	core.Size = Vector3.new(1.5, 1.5, 1.5)
-	core.Shape = Enum.PartType.Ball
-	core.Material = Enum.Material.SmoothPlastic
-	core.Color = part.Color:Lerp(Color3.new(0, 0, 0), 0.3)
-	core.Transparency = 0.5
-	core.Position = position
-	core.Anchored = true
-	core.CanCollide = false
-	core.Parent = model
-	
-	-- Eyes
-	for i, offset in ipairs({ Vector3.new(-0.5, 0.3, 1), Vector3.new(0.5, 0.3, 1) }) do
-		local eye = Instance.new("Part")
-		eye.Name = "Eye" .. i
-		eye.Size = Vector3.new(0.4, 0.4, 0.2)
-		eye.Shape = Enum.PartType.Ball
-		eye.Material = Enum.Material.SmoothPlastic
-		eye.Color = Color3.new(1, 1, 1)
-		eye.Position = position + offset
-		eye.Anchored = true
-		eye.CanCollide = false
-		eye.Parent = model
-		
-		-- Pupil
-		local pupil = Instance.new("Part")
-		pupil.Name = "Pupil" .. i
-		pupil.Size = Vector3.new(0.2, 0.2, 0.1)
-		pupil.Shape = Enum.PartType.Ball
-		pupil.Material = Enum.Material.SmoothPlastic
-		pupil.Color = Color3.new(0, 0, 0)
-		pupil.Position = position + offset + Vector3.new(0, 0, 0.15)
-		pupil.Anchored = true
-		pupil.CanCollide = false
-		pupil.Parent = model
-	end
+	local color = ELEMENT_COLORS[element] or ELEMENT_COLORS.Normal
 	
 	-- UI Billboard
 	local bgui = Instance.new("BillboardGui")
 	bgui.Name = "NameTag"
-	bgui.Size = UDim2.fromScale(4, 1)
+	bgui.Size = UDim2.fromScale(6, 1.5)
 	bgui.AlwaysOnTop = true
-	bgui.StudsOffset = Vector3.new(0, 3.5, 0)
-	bgui.Parent = part
+	bgui.StudsOffset = Vector3.new(0, 4.5, 0)
+	bgui.Parent = root
 	
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.fromScale(1, 1)
 	label.BackgroundTransparency = 1
-	label.TextColor3 = part.Color
-	label.TextStrokeTransparency = 0
-	label.TextStrokeColor3 = Color3.new(0, 0, 0)
+	label.TextColor3 = Color3.new(1, 1, 1)
+	label.TextStrokeTransparency = 0.2
+	label.TextStrokeColor3 = color:Lerp(Color3.new(0,0,0), 0.5)
 	label.Font = Enum.Font.GothamBold
 	label.TextScaled = true
-	label.Text = term
+	label.Text = term:upper()
 	label.Parent = bgui
 	
 	-- Element indicator
 	local elementLabel = Instance.new("TextLabel")
-	elementLabel.Size = UDim2.fromScale(1, 0.5)
-	elementLabel.Position = UDim2.fromScale(0, 1.2)
+	elementLabel.Size = UDim2.fromScale(1, 0.6)
+	elementLabel.Position = UDim2.fromScale(0, 0.9)
 	elementLabel.BackgroundTransparency = 1
 	elementLabel.TextColor3 = Color3.new(1, 1, 1)
-	elementLabel.TextStrokeTransparency = 0
+	elementLabel.TextStrokeTransparency = 0.5
 	elementLabel.Font = Enum.Font.Gotham
-	elementLabel.TextSize = 12
+	elementLabel.TextSize = 14
 	elementLabel.Text = element and GameConfig.Elements[element] and GameConfig.Elements[element].Emoji or "❓"
 	elementLabel.Parent = bgui
 	
 	model.Parent = workspace
 	
 	-- Create VFX
-	local vfx = createSlimeVFX(part, element)
+	local vfx = createSlimeVFX(root, element)
 	
 	slimes[id] = {
 		Model = model,
-		Root = part,
+		Root = root,
 		Term = term,
 		Element = element or "Normal",
 		State = "Idle",
@@ -352,8 +388,9 @@ function SlimeController:SpawnSlime(id: string, term: string, position: Vector3,
 		VFX = vfx,
 	}
 	
-	print("[SlimeController] Spawned slime: " .. term .. " (" .. (element or "Normal") .. ")")
+	print("[SlimeController] Spawned detailed slime: " .. term .. " (" .. (element or "Normal") .. ")")
 end
+
 
 function SlimeController:DespawnSlime(id: string, captured: boolean)
 	local slime = slimes[id]
@@ -441,7 +478,24 @@ function SlimeController:Update(dt: number)
 			continue 
 		end
 		
-		local dist = (root.Position - slimeRoot.Position).Magnitude
+		-- Flatten distance check
+		local flatSlimePos = Vector3.new(slimeRoot.Position.X, 0, slimeRoot.Position.Z)
+		local flatRootPos = Vector3.new(root.Position.X, 0, root.Position.Z)
+		local dist = (flatRootPos - flatSlimePos).Magnitude
+		
+		-- Raycast to find ground level
+		local rayOrigin = Vector3.new(slimeRoot.Position.X, 500, slimeRoot.Position.Z)
+		local rayDirection = Vector3.new(0, -1000, 0)
+		local raycastParams = RaycastParams.new()
+		raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+		raycastParams.FilterDescendantsInstances = {slime.Model, char}
+		local rayResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+		
+		-- Slime root is a 2.8 stud diameter sphere, so center is 1.4 studs above ground
+		local targetGroundY = rayResult and (rayResult.Position.Y + 1.4) or slime.Origin.Y
+		
+		-- Smoothly interpolate origin.Y so slimes don't snap teleport on cliffs
+		slime.Origin = Vector3.new(slime.Origin.X, slime.Origin.Y + (targetGroundY - slime.Origin.Y) * (dt * 10), slime.Origin.Z)
 		
 		-- State Machine
 		if slime.State == "Idle" then
@@ -450,23 +504,25 @@ function SlimeController:Update(dt: number)
 			local bounce = math.sin(slime.Timer) * BOUNCE_HEIGHT
 			local squish = 1 + math.sin(slime.Timer * 2) * 0.1
 			
-			slimeRoot.Position = Vector3.new(
+			-- Keep its original rotation but update position
+			local curYRot = select(2, slimeRoot.CFrame:ToEulerAnglesYXZ())
+			slimeRoot.CFrame = CFrame.new(
 				slimeRoot.Position.X, 
-				slime.Origin.Y + bounce, 
+				slime.Origin.Y + math.abs(bounce), 
 				slimeRoot.Position.Z
-			)
+			) * CFrame.Angles(0, curYRot, 0)
 			
 			-- Squish effect
-			slimeRoot.Size = Vector3.new(3 * squish, 3 / squish, 3 * squish)
+			slimeRoot.Size = Vector3.new(2.8 * squish, 2.8 / squish, 2.8 * squish)
 			
-			-- Random hop
-			if math.random() < 0.002 then
-				local hopDir = Vector3.new(
-					(math.random() - 0.5) * 10,
-					0,
-					(math.random() - 0.5) * 10
-				)
+			-- Random hop occasionally
+			if math.random() < 0.005 then
+				local hopAngle = math.random() * math.pi * 2
+				local hopDist = math.random() * 8
+				local hopDir = Vector3.new(math.cos(hopAngle) * hopDist, 0, math.sin(hopAngle) * hopDist)
 				slime.Origin = slime.Origin + hopDir
+				-- Face the jump direction
+				slimeRoot.CFrame = CFrame.new(slimeRoot.Position, slimeRoot.Position + hopDir)
 			end
 			
 			if dist < DETECT_RANGE then
@@ -476,63 +532,79 @@ function SlimeController:Update(dt: number)
 			
 		elseif slime.State == "Alert" then
 			-- Look at player
-			local lookDir = (root.Position - slimeRoot.Position).Unit
-			local targetCF = CFrame.lookAt(slimeRoot.Position, root.Position)
-			slimeRoot.CFrame = slimeRoot.CFrame:Lerp(targetCF, dt * 5)
+			local targetCF = CFrame.lookAt(slimeRoot.Position, Vector3.new(root.Position.X, slimeRoot.Position.Y, root.Position.Z))
+			slimeRoot.CFrame = slimeRoot.CFrame:Lerp(targetCF, dt * 8)
 			
 			-- Nervous bounce
-			slime.Timer += dt * BOUNCE_SPEED * 2
-			local bounce = math.sin(slime.Timer) * BOUNCE_HEIGHT * 0.5
+			slime.Timer += dt * BOUNCE_SPEED * 2.5
+			local bounce = math.sin(slime.Timer) * BOUNCE_HEIGHT * 0.6
+			local squish = 1 + math.sin(slime.Timer * 5) * 0.05
+			
 			slimeRoot.Position = Vector3.new(
 				slimeRoot.Position.X, 
-				slime.Origin.Y + bounce, 
+				slime.Origin.Y + math.abs(bounce), 
 				slimeRoot.Position.Z
 			)
+			slimeRoot.Size = Vector3.new(2.8 * squish, 2.8 / squish, 2.8 * squish)
 			
 			if dist > FLEE_RANGE then
 				slime.State = "Idle"
-			elseif dist < DETECT_RANGE * 0.5 then
+			elseif dist < DETECT_RANGE * 0.6 then
 				-- Too close, start fleeing
 				slime.State = "Fleeing"
 			end
 			
 		elseif slime.State == "Fleeing" then
 			-- Run away from player
-			local fleeDir = (slimeRoot.Position - root.Position).Unit
-			local targetPos = slime.Origin + fleeDir * 20
+			local fleeDir = (flatSlimePos - flatRootPos).Unit
+			if fleeDir.Magnitude == 0 or fleeDir ~= fleeDir then -- Prevent NaN
+				fleeDir = Vector3.new(1, 0, 0)
+			end
 			
-			-- Keep in bounds (simple)
-			targetPos = Vector3.new(
-				math.clamp(targetPos.X, -400, 400),
-				targetPos.Y,
-				math.clamp(targetPos.Z, -400, 400)
+			local targetFlatPos = flatSlimePos + fleeDir * 20
+			
+			-- Keep in bounds (simple map limit)
+			targetFlatPos = Vector3.new(
+				math.clamp(targetFlatPos.X, -800, 800),
+				0,
+				math.clamp(targetFlatPos.Z, -800, 800)
 			)
 			
-			slimeRoot.Position = slimeRoot.Position:Lerp(targetPos, dt * 3)
-			slime.Origin = Vector3.new(slimeRoot.Position.X, slime.Origin.Y, slimeRoot.Position.Z)
+			-- Move XZ
+			local currentPos = Vector3.new(slimeRoot.Position.X, 0, slimeRoot.Position.Z)
+			local newPos = currentPos:Lerp(targetFlatPos, dt * 5)
+			slime.Origin = Vector3.new(newPos.X, slime.Origin.Y, newPos.Z)
 			
 			-- Fast bounce while fleeing
-			slime.Timer += dt * BOUNCE_SPEED * 3
+			slime.Timer += dt * BOUNCE_SPEED * 3.5
 			local bounce = math.sin(slime.Timer) * BOUNCE_HEIGHT * 1.5
-			slimeRoot.Position = Vector3.new(
-				slimeRoot.Position.X, 
-				slime.Origin.Y + bounce, 
-				slimeRoot.Position.Z
-			)
+			local squish = 1 + math.sin(slime.Timer * 3.5) * 0.15
+			
+			-- Look in flee direction
+			local lookTarget = Vector3.new(targetFlatPos.X, slime.Origin.Y + math.abs(bounce), targetFlatPos.Z)
+			local newCFrame = CFrame.new(Vector3.new(newPos.X, slime.Origin.Y + math.abs(bounce), newPos.Z), lookTarget)
+			
+			slimeRoot.CFrame = slimeRoot.CFrame:Lerp(newCFrame, dt * 10)
+			slimeRoot.Size = Vector3.new(2.8 * squish, 2.8 / squish, 2.8 * squish)
 			
 			if dist > FLEE_RANGE then
 				slime.State = "Idle"
 			end
 		end
 		
-		-- Update VFX color based on state
-		if slime.VFX and slime.VFX.light then
-			if slime.State == "Alert" then
-				slime.VFX.light.Brightness = 2
-			elseif slime.State == "Fleeing" then
-				slime.VFX.light.Brightness = 3
-			else
-				slime.VFX.light.Brightness = 1
+		-- Update VFX based on state
+		if slime.VFX then
+			if slime.VFX.light then
+				if slime.State == "Alert" then
+					slime.VFX.light.Brightness = 2.5
+				elseif slime.State == "Fleeing" then
+					slime.VFX.light.Brightness = 4.0
+				else
+					slime.VFX.light.Brightness = 1.0
+				end
+			end
+			if slime.VFX.trail then
+				slime.VFX.trail.Enabled = (slime.State == "Fleeing")
 			end
 		end
 	end

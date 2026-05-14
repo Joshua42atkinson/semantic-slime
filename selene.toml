@@ -1,12 +1,8 @@
-name = "roblox-standard"
 std = "roblox"
 
-[rules]
+[lints]
 unused_variable = "allow"
 shadowing = "allow"
 multiple_statements = "allow"
 incorrect_standard_library_use = "warn"
-global_usage = "warn"
-
-[lints]
 global_usage = "allow"

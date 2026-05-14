@@ -6,7 +6,7 @@ export type Achievement = {
     Name: string,
     Description: string,
     Icon: string,
-    Category: "Collection" | "Progression" | "Combat" | "Social",
+    Category: "Collection" | "Progression" | "Cleverness" | "Social",
     Requirement: number, -- For progressive tracking (e.g., collect 10 words)
 }
 
@@ -79,37 +79,37 @@ local AchievementData: { [string]: Achievement } = {
         Requirement = 25,
     },
 
-    -- Combat
-    ["first_battle"] = {
-        Id = "first_battle",
-        Name = "Rap Battle Rookie",
-        Description = "Win your first Semantic Rap Battle.",
-        Icon = "🎤",
-        Category = "Combat",
+    -- Cleverness (was Combat)
+    ["first_madlib"] = {
+        Id = "first_madlib",
+        Name = "Wordsmith Apprentice",
+        Description = "Complete your first Mad Lib quest.",
+        Icon = "📝",
+        Category = "Cleverness",
         Requirement = 1,
     },
-    ["crit_strike"] = {
-        Id = "crit_strike",
-        Name = "Lyrical Genius",
-        Description = "Land a Critical Hit using a Perfect Synonym.",
-        Icon = "💥",
-        Category = "Combat",
-        Requirement = 1,
+    ["shake_letters"] = {
+        Id = "shake_letters",
+        Name = "Not Today, Letters!",
+        Description = "Shake off 10 clingy nuisance letters by using them in words.",
+        Icon = "🤚",
+        Category = "Cleverness",
+        Requirement = 10,
     },
-    ["shield_block"] = {
-        Id = "shield_block",
-        Name = "Word Wall",
-        Description = "Block an attack using an Antonym.",
-        Icon = "🛡️",
-        Category = "Combat",
-        Requirement = 1,
+    ["wordbuilder"] = {
+        Id = "wordbuilder",
+        Name = "Walking Dictionary",
+        Description = "Construct 25 words from collected letters.",
+        Icon = "📖",
+        Category = "Cleverness",
+        Requirement = 25,
     },
-    ["battle_master_10"] = {
-        Id = "battle_master_10",
-        Name = "Stage Dominator",
-        Description = "Win 10 Semantic Rap Battles.",
-        Icon = "🔥",
-        Category = "Combat",
+    ["madlib_master"] = {
+        Id = "madlib_master",
+        Name = "Mad Lib Legend",
+        Description = "Complete 10 Mad Lib quests.",
+        Icon = "🏆",
+        Category = "Cleverness",
         Requirement = 10,
     },
 

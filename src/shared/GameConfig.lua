@@ -60,6 +60,7 @@ GameConfig.Colors = {
 	Light     = Color3.fromHex("EEF2FF"), -- lavender white
 	Text      = Color3.fromHex("FFFFFF"),
 	TextDim   = Color3.fromHex("A5B4FC"), -- muted lavender
+	Base      = Color3.fromHex("2D2B55"), -- deep purple base
 	Danger    = Color3.fromHex("EF4444"), -- red
 	Steam     = Color3.fromHex("9CA3AF"), -- grey mist
 }

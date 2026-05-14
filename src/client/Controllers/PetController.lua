@@ -1,4 +1,7 @@
 --!strict
+--==============================================================
+-- MMMM Context: Manages the close-proximity companion behaviors of Slimes, establishing an emotional bond through localized dialogue.
+--==============================================================
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")

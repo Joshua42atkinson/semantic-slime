@@ -12,13 +12,16 @@ local HUDController = Knit.CreateController { Name = "HUDController" }
 
 -- UI Modules
 local QuestLog = require(script.Parent.Parent.UI.QuestLog)
-local BattleUI = require(script.Parent.Parent.UI.BattleUI)
 local SlimeCollectionUI = require(script.Parent.Parent.UI.SlimeCollectionUI)
 local DialogueUI = require(script.Parent.Parent.UI.DialogueUI)
 local LureUI = require(script.Parent.Parent.UI.LureUI)
 local TutorialUI = require(script.Parent.Parent.UI.TutorialUI)
 local InventoryUI = require(script.Parent.Parent.UI.InventoryUI)
 local AchievementUI = require(script.Parent.Parent.UI.AchievementUI)
+local EvolutionUI = require(script.Parent.Parent.UI.EvolutionUI)
+local GalleryUI = require(script.Parent.Parent.UI.GalleryUI)
+local CosmeticUI = require(script.Parent.Parent.UI.CosmeticUI)
+local PedagogyDashboardUI = require(script.Parent.Parent.UI.PedagogyDashboardUI)
 
 -- State
 local playerStats = {
@@ -30,25 +33,58 @@ local playerStats = {
 function HUDController:KnitStart()
 	print("[HUDController] Starting...")
 	
-	-- Initialize UI components
-	self:CreateMainHUD()
-	self:InitializeServiceConnections()
-	self:SetupKeyboardShortcuts()
+	-- Initialize UI components with error handling
+	local success, result = pcall(function()
+		self:CreateMainHUD()
+	end)
+	if not success then
+		warn("[HUDController] Failed to create main HUD:", result)
+	end
 	
-	-- Initialize Battle UI
-	BattleUI.Initialize()
+	success, result = pcall(function()
+		self:InitializeServiceConnections()
+	end)
+	if not success then
+		warn("[HUDController] Failed to initialize service connections:", result)
+	end
 	
-	-- Initialize Slime Collection UI
-	SlimeCollectionUI.Initialize()
+	success, result = pcall(function()
+		self:SetupKeyboardShortcuts()
+	end)
+	if not success then
+		warn("[HUDController] Failed to setup keyboard shortcuts:", result)
+	end
 	
-	-- Initialize Tutorial UI (for new players)
-	TutorialUI.Initialize()
+	-- Initialize UI modules with error handling
+	local uiModules = {
+		{ name = "SlimeCollectionUI", module = SlimeCollectionUI },
+		{ name = "TutorialUI", module = TutorialUI },
+		{ name = "InventoryUI", module = InventoryUI },
+		{ name = "DialogueUI", module = DialogueUI },
+		{ name = "LureUI", module = LureUI },
+		{ name = "QuestLog", module = QuestLog },
+		{ name = "AchievementUI", module = AchievementUI },
+		{ name = "EvolutionUI", module = EvolutionUI },
+		{ name = "GalleryUI", module = GalleryUI },
+		{ name = "CosmeticUI", module = CosmeticUI },
+		{ name = "PedagogyDashboardUI", module = PedagogyDashboardUI },
+	}
 	
-	-- Initialize Inventory UI
-	InventoryUI.Initialize()
+	for _, uiModule in ipairs(uiModules) do
+		success, result = pcall(function()
+			if uiModule.module and uiModule.module.Initialize then
+				uiModule.module.Initialize()
+				print("[HUDController] Initialized", uiModule.name)
+			else
+				print("[HUDController] Skipping", uiModule.name, "- no Initialize method")
+			end
+		end)
+		
+		if not success then
+			warn("[HUDController] Failed to initialize", uiModule.name, ":", result)
+		end
+	end
 	
-	-- Initialize Achievement UI
-	AchievementUI.Initialize()
 	
 	print("[HUDController] Started successfully.")
 end
@@ -229,10 +265,19 @@ function HUDController:CreateActionBar(parent: Instance)
 	-- Action buttons
 	local actions = {
 		{ Name = "Collection", Key = "I", Icon = "🧪", Callback = function() SlimeCollectionUI.Toggle() end },
-		{ Name = "Quests", Key = "J", Icon = "📜", Callback = function() self:ToggleQuestLog() end },
+		{ Name = "Archetype Manifestations", Key = "J", Icon = "📜", Callback = function() self:ToggleQuestLog() end },
 		{ Name = "Achievements", Key = "Y", Icon = "🏆", Callback = function() AchievementUI.Toggle() end },
+		{ Name = "Philanthropy", Key = "P", Icon = "🌟", Callback = function() 
+		    local mps = game:GetService("MarketplaceService")
+		    mps:PromptProductPurchase(Players.LocalPlayer, 1000003) -- Golden Letter
+		end },
+		{ Name = "Auras", Key = "O", Icon = "✨", Callback = function() CosmeticUI.Toggle() end },
+		{ Name = "Analytics", Key = "T", Icon = "📊", Callback = function() PedagogyDashboardUI.Toggle() end },
 		{ Name = "Settings", Key = "Esc", Icon = "⚙️", Callback = function() self:OpenSettings() end },
 	}
+	
+	-- Dynamically wider action bar to fit 7 buttons
+	actionBar.Size = UDim2.fromOffset(700, 60)
 	
 	for i, action in ipairs(actions) do
 		local btn = Instance.new("TextButton")
@@ -366,11 +411,11 @@ function HUDController:InitializeServiceConnections()
 	-- Connect to DataService for stats updates
 	local DataService = Knit.GetService("DataService")
 	
-	DataService.Client.DataLoaded:Connect(function(data)
+	DataService.DataLoaded:Connect(function(data)
 		self:UpdateStats(data)
 	end)
 	
-	DataService.Client.DataUpdated:Connect(function(key, value)
+	DataService.DataUpdated:Connect(function(key, value)
 		if key == "Stats" or key == "Level" or key == "XP" then
 			self:UpdateStats(value)
 		elseif key == "AchievementUnlocked" then
@@ -379,34 +424,36 @@ function HUDController:InitializeServiceConnections()
 			if data then
 				self:ShowAchievementPopup(data)
 			end
+		elseif key == "LinguisticLog" then
+		    PedagogyDashboardUI.PopulateData(value)
 		end
 	end)
 	
 	-- Connect to CrystalService for crystal collection
 	local CrystalService = Knit.GetService("CrystalService")
 	
-	CrystalService.Client.CrystalCollected:Connect(function(letter, rarity)
+	CrystalService.CrystalCollected:Connect(function(letter, rarity)
 		self:ShowNotification("Collected " .. rarity .. " crystal: " .. letter, 2)
 	end)
 	
 	-- Connect to SlimeFactory for slime creation
 	local SlimeFactory = Knit.GetService("SlimeFactory")
 	
-	SlimeFactory.Client.SlimeCreated:Connect(function(slime)
+	SlimeFactory.SlimeCreated:Connect(function(slime)
 		self:ShowNotification("New Slime: " .. slime.Term .. " (" .. slime.Rarity .. ")", 3)
 	end)
 	
 	-- Connect to MadLibService for quest updates
 	local MadLibService = Knit.GetService("MadLibService")
 	
-	MadLibService.Client.QuestGenerated:Connect(function(quest)
+	MadLibService.QuestGenerated:Connect(function(quest)
 		self:ShowNotification("New Quest: " .. quest.Title, 3)
 		-- Update quest log
 		local container = QuestLog.Create()
 		QuestLog.UpdateQuest(container, quest)
 	end)
 	
-	MadLibService.Client.QuestCompleted:Connect(function(quest)
+	MadLibService.QuestCompleted:Connect(function(quest)
 		self:ShowNotification("Quest Complete! +" .. quest.Rewards.XP .. " XP", 4)
 		QuestLog.RemoveQuest(quest.QuestId)
 	end)
@@ -414,11 +461,11 @@ function HUDController:InitializeServiceConnections()
 	-- Connect to GameLoopService for phase changes
 	local GameLoopService = Knit.GetService("GameLoopService")
 	
-	GameLoopService.Client.PhaseChanged:Connect(function(phase, duration)
+	GameLoopService.PhaseChanged:Connect(function(phase, duration)
 		self:OnPhaseChanged(phase, duration)
 	end)
 	
-	GameLoopService.Client.GameLoopEvent:Connect(function(eventType, data)
+	GameLoopService.GameLoopEvent:Connect(function(eventType, data)
 		self:OnGameEvent(eventType, data)
 	end)
 end
@@ -435,12 +482,20 @@ function HUDController:SetupKeyboardShortcuts()
 			self:ToggleQuestLog()
 		elseif input.KeyCode == Enum.KeyCode.B then
 			InventoryUI.Toggle()
-		-- K = Word Constructor (during Construction phase)
+		-- K = Slime Fabricator (during Construction phase)
 		elseif input.KeyCode == Enum.KeyCode.K then
-			local WordConstructorController = Knit.GetController("WordConstructorController")
-			if WordConstructorController then
-				WordConstructorController:Toggle()
+			local SlimeFabricatorController = Knit.GetController("WordConstructorController")
+			if SlimeFabricatorController then
+				SlimeFabricatorController:Toggle()
 			end
+		-- U = Evolution UI
+		elseif input.KeyCode == Enum.KeyCode.U then
+			EvolutionUI.Show = EvolutionUI.Show or function() end
+			EvolutionUI.Show(EvolutionUI)
+		-- O = Gallery UI
+		elseif input.KeyCode == Enum.KeyCode.O then
+			GalleryUI.Show = GalleryUI.Show or function() end
+			GalleryUI.Show(GalleryUI)
 		end
 	end)
 end
@@ -469,8 +524,9 @@ function HUDController:OnPhaseChanged(phase: string, duration: number)
 		Collection = "The World Breathes in Letters",
 		Construction = "Crystallizing Meaning",
 		Quest = "Manifesting the Hero's Journey",
-		Combat = "Discord in the Psyche",
+		Nuisance = "The Letters Are Restless",
 		Rewards = "Resonance of Achievement",
+		Reflection = "Reflective Silence",
 	}
 	
 	self:ShowNotification(phaseNames[phase] or phase, 3)
@@ -553,6 +609,11 @@ function HUDController:OnGameEvent(eventType: string, data: any)
 	elseif eventType == "ObjectiveComplete" then
 		self:ShowNotification("🎯 Objective Complete: " .. tostring(data.Bonus), 4)
 		self:UpdateObjectiveUI(data)
+	elseif eventType == "HighResonance" then
+		self:ShowNotification("⚡ HIGH RESONANCE ACTIVATED! ⚡", 5)
+		self:ShowResonanceUI(data)
+	elseif eventType == "ResonanceIncreased" then
+		self:UpdateResonanceUI(data)
 	end
 end
 
@@ -620,6 +681,67 @@ function HUDController:UpdateObjectiveUI(objectiveData: any)
 	local bonusLabel = objectivePanel:FindFirstChild("BonusLabel")
 	if bonusLabel and objectiveData then
 		bonusLabel.Text = "✓ " .. objectiveData.Bonus .. " COMPLETED!"
+	end
+end
+
+function HUDController:ShowResonanceUI(data: any)
+	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+	
+	-- Update ObjectivePanel to "Resonance" mode
+	local objectivePanel = playerGui:FindFirstChild("ObjectivePanel")
+	if not objectivePanel then
+		self:UpdateObjectiveUI({ Bonus = "Resonance" })
+		objectivePanel = playerGui:FindFirstChild("ObjectivePanel")
+	end
+	
+	if objectivePanel then
+		local title = objectivePanel:FindFirstChild("TitleLabel")
+		if title then title.Text = "⚡ RESONANCE LEVEL ⚡" end
+		
+		local bonus = objectivePanel:FindFirstChild("BonusLabel")
+		if bonus then bonus.Text = "Multiplier: 1.0x" end
+		
+		-- Flash effect for high impact
+		local originalColor = objectivePanel.BackgroundColor3
+		objectivePanel.BackgroundColor3 = GameConfig.Colors.Accent
+		task.delay(0.5, function()
+			TweenService:Create(objectivePanel, TweenInfo.new(1), {
+				BackgroundColor3 = originalColor
+			}):Play()
+		end)
+	end
+	
+	-- Play special sound
+	local SoundController = Knit.GetController("SoundController")
+	if SoundController then
+		SoundController:Play("Victory")
+	end
+end
+
+function HUDController:UpdateResonanceUI(data: any)
+	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+	local objectivePanel = playerGui:FindFirstChild("ObjectivePanel")
+	
+	if objectivePanel then
+		local bonus = objectivePanel:FindFirstChild("BonusLabel")
+		if bonus then 
+			bonus.Text = "Multiplier: " .. string.format("%.1f", data.Multiplier) .. "x"
+		end
+		
+		-- Subtle pulse to show growth
+		local info = TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out, 0, true)
+		TweenService:Create(objectivePanel, info, {
+			Size = UDim2.fromOffset(260, 90)
+		}):Play()
+		
+		-- Change color based on tier
+		if data.Multiplier >= 5.0 then
+			objectivePanel.BackgroundColor3 = Color3.fromHex("#F59E0B") -- Transcendent (Amber)
+		elseif data.Multiplier >= 2.5 then
+			objectivePanel.BackgroundColor3 = Color3.fromHex("#8B5CF6") -- Harmonic (Purple)
+		elseif data.Multiplier >= 1.5 then
+			objectivePanel.BackgroundColor3 = Color3.fromHex("#3B82F6") -- Resonant (Blue)
+		end
 	end
 end
 

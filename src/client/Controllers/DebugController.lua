@@ -1,4 +1,7 @@
 --!strict
+--==============================================================
+-- MMMM Context: Client-side diagnostic tool. Exposes internal state for testing without disrupting the live ecosystem.
+--==============================================================
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local CollectionService = game:GetService("CollectionService")

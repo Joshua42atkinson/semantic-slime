@@ -1,4 +1,7 @@
 --!strict
+--==============================================================
+-- MMMM Context: Allows players to manipulate letter spawn rates locally. A tactical mechanic to attract specific vowel/consonant ratios.
+--==============================================================
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
