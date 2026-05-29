@@ -441,16 +441,16 @@ function SlimeFactory:CreateSlime(player: Player, word: string): (SlimeInstance?
 
 	-- Analyze the word with error handling
 	local root, suffix, modifier
-	local analysisSuccess, analysisResult = pcall(function()
+	local analysisSuccess, rResult, sResult, mResult = pcall(function()
 		return analyzeWord(word)
 	end)
 	
 	if not analysisSuccess then
-		warn("[SlimeFactory] Error analyzing word:", analysisResult)
+		warn("[SlimeFactory] Error analyzing word:", rResult)
 		return nil, "Error analyzing word"
 	end
 	
-	root, suffix, modifier = analysisResult
+	root, suffix, modifier = rResult, sResult, mResult
 	
 	-- Determine element and role with error handling
 	local element, role
@@ -478,18 +478,18 @@ function SlimeFactory:CreateSlime(player: Player, word: string): (SlimeInstance?
 	
 	-- Create the slime instance (FAB-005) with error handling
 	local rarity, baseStats
-	local creationSuccess, creationResult = pcall(function()
+	local creationSuccess, rarityResult, statsResult = pcall(function()
 		local slimeRarity = generateRarity(word, root)
 		local slimeStats = calculateStats(slimeRarity, role, 1, root, suffix)
 		return slimeRarity, slimeStats
 	end)
 	
 	if not creationSuccess then
-		warn("[SlimeFactory] Error creating slime stats:", creationResult)
+		warn("[SlimeFactory] Error creating slime stats:", rarityResult)
 		return nil, "Error creating slime"
 	end
 	
-	rarity, baseStats = creationResult
+	rarity, baseStats = rarityResult, statsResult
 	
 	local slime: SlimeInstance = {
 		InstanceId = HttpService:GenerateGUID(false),

@@ -31,6 +31,10 @@ local MadLibService: any = nil
 local GameLoopService: any = nil
 local SlimeFactory: any = nil
 
+local hideQuestUI
+local onSlotClicked
+local attemptQuestCompletion
+
 -- Sound effects
 local questSounds = {
 	accept = Instance.new("Sound"),
@@ -337,7 +341,7 @@ local function showQuestUI(quest: any)
 end
 
 -- Hide quest UI
-local function hideQuestUI()
+function hideQuestUI()
 	if not questUI or not questUI.Parent then return end
 	
 	local mainFrame = questUI:FindFirstChild("MainFrame")
@@ -357,7 +361,7 @@ local function hideQuestUI()
 end
 
 -- Handle slot clicks — opens a text input popup so the player can type a word
-local function onSlotClicked(slotButtonKey: string)
+function onSlotClicked(slotButtonKey: string)
 	if not isQuestActive or not currentQuest then return end
 	
 	local slotButton = slotButtons[slotButtonKey]
@@ -444,7 +448,7 @@ local function onSlotClicked(slotButtonKey: string)
 end
 
 -- Attempt quest completion
-local function attemptQuestCompletion()
+function attemptQuestCompletion()
 	if not isQuestActive or not currentQuest then return end
 	
 	local success, result = pcall(function()

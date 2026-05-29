@@ -481,7 +481,7 @@ function GameLoopService:CompleteWordConstruction(player: Player, word: string):
 	end
 	
 	-- Create slime
-	local slimeCreated, result = pcall(function()
+	local slimeCreated, result, errorMsg = pcall(function()
 		return SlimeFactory:CreateSlime(player, word)
 	end)
 	if not slimeCreated then
@@ -489,7 +489,7 @@ function GameLoopService:CompleteWordConstruction(player: Player, word: string):
 		return false, "Error creating slime"
 	end
 	
-	local slime, errorMsg = result
+	local slime = result
 	if slime then
 		print("[GameLoopService] " .. player.Name .. " created slime: " .. slime.Term)
 		

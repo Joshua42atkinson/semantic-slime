@@ -9,6 +9,9 @@ local TweenService = game:GetService("TweenService")
 
 local MobileAdaptation = {}
 
+local addMobileControls
+
+
 -- Configuration
 local MOBILE_SCALE_FACTOR = 0.8
 local TABLET_SCALE_FACTOR = 0.9
@@ -183,7 +186,7 @@ function MobileAdaptation.AdaptUI(gui: ScreenGui)
 end
 
 -- Add mobile-specific controls
-local function addMobileControls(gui: ScreenGui)
+function addMobileControls(gui: ScreenGui)
     -- Add virtual joystick area
     local joystickArea = Instance.new("Frame")
     joystickArea.Name = "JoystickArea"

@@ -105,14 +105,8 @@ local function generateBuildingInterior(cframe: CFrame, size: Vector3, buildingN
 			light.Brightness = 2
 			light.Range = 20
 			light.Parent = part
-		elseif room.Type == "wall" then
-			-- Walls are collidable
-			part.CanCollide = true
-		elseif room.Type == "floor" then
-			-- Floors are collidable
-			part.CanCollide = true
-		elseif room.Type == "furniture" then
-			-- Furniture is collidable
+		elseif room.Type == "wall" or room.Type == "floor" or room.Type == "furniture" then
+			-- Walls, floors, and furniture are collidable
 			part.CanCollide = true
 		elseif room.Type == "deco" then
 			-- Decorations are not collidable

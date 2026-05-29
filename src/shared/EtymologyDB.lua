@@ -192,14 +192,13 @@ local EtymologyDB = {
         ["able"] = { Role = "Healer", StatBonus = "Pathos", Examples = {"Readable"} },
         ["ible"] = { Role = "Buffer", StatBonus = "Ethos", Examples = {"Visible"} },
         ["y"] = { Role = "Support", StatBonus = "Speed", Examples = {"Shiny"} },
-        ["less"] = { Role = "Striker", StatBonus = "Logos", Examples = {"Fearless"} },
+        ["less"] = { Role = "Striker", StatBonus = "Logos", Examples = {"Fearless", "Aimless"} },
         ["ful"] = { Role = "Buffer", StatBonus = "Ethos", Examples = {"Hopeful"} },
         ["ic"] = { Role = "Caster", StatBonus = "Logos", Examples = {"Heroic"} },
         ["ist"] = { Role = "Caster", StatBonus = "Logos", Examples = {"Scientist"} },
         ["logy"] = { Role = "Support", StatBonus = "Ethos", Examples = {"Biology"} },
         ["phobia"] = { Role = "Assassin", StatBonus = "Pathos", Examples = {"Arachnophobia"} },
-        ["cracy"] = { Role = "Tank", StatBonus = "Ethos", Examples = {"Democracy"} },
-        ["less"] = { Role = "Striker", StatBonus = "Speed", Examples = {"Aimless"} }
+        ["cracy"] = { Role = "Tank", StatBonus = "Ethos", Examples = {"Democracy"} }
     } :: { [string]: SuffixData },
 
     -- Morpheme Whitelist for validation (Part VI of Technical Bible)

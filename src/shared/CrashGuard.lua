@@ -74,12 +74,12 @@ end
 -- Log a final boot report
 function CrashGuard.BootReport(loaded: number, failed: number, failedNames: {string})
 	local mem = CrashGuard.GetMemoryKB()
-	print(string.format("[Boot] ════════════════════════════════════════"))
+	print("[Boot] ════════════════════════════════════════")
 	print(string.format("[Boot] BOOT COMPLETE — %d loaded, %d failed, %dKB memory", loaded, failed, mem))
 	if failed > 0 then
 		warn(string.format("[Boot] Failed: %s", table.concat(failedNames, ", ")))
 	end
-	print(string.format("[Boot] ════════════════════════════════════════"))
+	print("[Boot] ════════════════════════════════════════")
 end
 
 return CrashGuard
