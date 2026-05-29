@@ -10,18 +10,11 @@ local GameConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild
 
 local HUDController = Knit.CreateController { Name = "HUDController" }
 
--- UI Modules
+-- UI Modules (Core only — archived modules removed)
 local QuestLog = require(script.Parent.Parent.UI.QuestLog)
 local SlimeCollectionUI = require(script.Parent.Parent.UI.SlimeCollectionUI)
 local DialogueUI = require(script.Parent.Parent.UI.DialogueUI)
-local LureUI = require(script.Parent.Parent.UI.LureUI)
-local TutorialUI = require(script.Parent.Parent.UI.TutorialUI)
 local InventoryUI = require(script.Parent.Parent.UI.InventoryUI)
-local AchievementUI = require(script.Parent.Parent.UI.AchievementUI)
-local EvolutionUI = require(script.Parent.Parent.UI.EvolutionUI)
-local GalleryUI = require(script.Parent.Parent.UI.GalleryUI)
-local CosmeticUI = require(script.Parent.Parent.UI.CosmeticUI)
-local PedagogyDashboardUI = require(script.Parent.Parent.UI.PedagogyDashboardUI)
 
 -- State
 local playerStats = {
@@ -58,16 +51,9 @@ function HUDController:KnitStart()
 	-- Initialize UI modules with error handling
 	local uiModules = {
 		{ name = "SlimeCollectionUI", module = SlimeCollectionUI },
-		{ name = "TutorialUI", module = TutorialUI },
 		{ name = "InventoryUI", module = InventoryUI },
 		{ name = "DialogueUI", module = DialogueUI },
-		{ name = "LureUI", module = LureUI },
 		{ name = "QuestLog", module = QuestLog },
-		{ name = "AchievementUI", module = AchievementUI },
-		{ name = "EvolutionUI", module = EvolutionUI },
-		{ name = "GalleryUI", module = GalleryUI },
-		{ name = "CosmeticUI", module = CosmeticUI },
-		{ name = "PedagogyDashboardUI", module = PedagogyDashboardUI },
 	}
 	
 	for _, uiModule in ipairs(uiModules) do
@@ -85,6 +71,13 @@ function HUDController:KnitStart()
 		end
 	end
 	
+	-- Start contextual hint system (replaces disabled tutorial)
+	success, result = pcall(function()
+		self:StartHintSystem()
+	end)
+	if not success then
+		warn("[HUDController] Failed to start hint system:", result)
+	end
 	
 	print("[HUDController] Started successfully.")
 end
@@ -106,9 +99,6 @@ function HUDController:CreateMainHUD()
 	
 	-- Bottom: Action Bar
 	self:CreateActionBar(screenGui)
-	
-	-- Bottom-right: Mini-map placeholder
-	self:CreateMiniMap(screenGui)
 	
 	-- Full-screen Phase Splash
 	self:CreatePhaseSplash(screenGui)
@@ -214,11 +204,11 @@ end
 function HUDController:CreatePhasePanel(parent: Instance)
 	local phaseFrame = Instance.new("Frame")
 	phaseFrame.Name = "PhasePanel"
-	phaseFrame.Size = UDim2.fromOffset(300, 60)
-	phaseFrame.Position = UDim2.fromScale(0.5, 0.05)
-	phaseFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+	phaseFrame.Size = UDim2.fromOffset(220, 36)
+	phaseFrame.Position = UDim2.fromScale(0.5, 0.02)
+	phaseFrame.AnchorPoint = Vector2.new(0.5, 0)
 	phaseFrame.BackgroundColor3 = GameConfig.Colors.Dark
-	phaseFrame.BackgroundTransparency = 0.3
+	phaseFrame.BackgroundTransparency = 0.5
 	phaseFrame.Parent = parent
 
 	local corner = Instance.new("UICorner")
@@ -227,11 +217,11 @@ function HUDController:CreatePhasePanel(parent: Instance)
 
 	self.phaseLabel = Instance.new("TextLabel")
 	self.phaseLabel.Name = "PhaseLabel"
-	self.phaseLabel.Size = UDim2.fromScale(1, 0.6)
+	self.phaseLabel.Size = UDim2.fromScale(1, 1)
 	self.phaseLabel.BackgroundTransparency = 1
-	self.phaseLabel.TextColor3 = Color3.new(1, 1, 1)
+	self.phaseLabel.TextColor3 = Color3.fromRGB(200, 220, 255)
 	self.phaseLabel.Font = Enum.Font.GothamBold
-	self.phaseLabel.TextSize = 22
+	self.phaseLabel.TextSize = 14
 	self.phaseLabel.Text = "Waiting..."
 	self.phaseLabel.Parent = phaseFrame
 
@@ -262,22 +252,18 @@ function HUDController:CreateActionBar(parent: Instance)
 	corner.CornerRadius = UDim.new(0, 12)
 	corner.Parent = actionBar
 	
-	-- Action buttons
+	-- Action buttons (Simplified for Core Loop)
 	local actions = {
-		{ Name = "Collection", Key = "I", Icon = "🧪", Callback = function() SlimeCollectionUI.Toggle() end },
-		{ Name = "Archetype Manifestations", Key = "J", Icon = "📜", Callback = function() self:ToggleQuestLog() end },
-		{ Name = "Achievements", Key = "Y", Icon = "🏆", Callback = function() AchievementUI.Toggle() end },
-		{ Name = "Philanthropy", Key = "P", Icon = "🌟", Callback = function() 
-		    local mps = game:GetService("MarketplaceService")
-		    mps:PromptProductPurchase(Players.LocalPlayer, 1000003) -- Golden Letter
+		{ Name = "Collection", Key = "I", Icon = "🎒", Callback = function() SlimeCollectionUI.Toggle() end },
+		{ Name = "Fabricator", Key = "K", Icon = "🧪", Callback = function() 
+		    local WordConstructorController = Knit.GetController("WordConstructorController")
+		    if WordConstructorController then WordConstructorController:Toggle() end
 		end },
-		{ Name = "Auras", Key = "O", Icon = "✨", Callback = function() CosmeticUI.Toggle() end },
-		{ Name = "Analytics", Key = "T", Icon = "📊", Callback = function() PedagogyDashboardUI.Toggle() end },
-		{ Name = "Settings", Key = "Esc", Icon = "⚙️", Callback = function() self:OpenSettings() end },
+		{ Name = "Quests", Key = "J", Icon = "📜", Callback = function() self:ToggleQuestLog() end },
 	}
 	
-	-- Dynamically wider action bar to fit 7 buttons
-	actionBar.Size = UDim2.fromOffset(700, 60)
+	-- Dynamically wider action bar to fit 3 buttons
+	actionBar.Size = UDim2.fromOffset(320, 60)
 	
 	for i, action in ipairs(actions) do
 		local btn = Instance.new("TextButton")
@@ -418,14 +404,6 @@ function HUDController:InitializeServiceConnections()
 	DataService.DataUpdated:Connect(function(key, value)
 		if key == "Stats" or key == "Level" or key == "XP" then
 			self:UpdateStats(value)
-		elseif key == "AchievementUnlocked" then
-			local AchievementData = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("AchievementData"))
-			local data = AchievementData[value]
-			if data then
-				self:ShowAchievementPopup(data)
-			end
-		elseif key == "LinguisticLog" then
-		    PedagogyDashboardUI.PopulateData(value)
 		end
 	end)
 	
@@ -471,31 +449,21 @@ function HUDController:InitializeServiceConnections()
 end
 
 function HUDController:SetupKeyboardShortcuts()
-	UserInputService.InputBegan:Connect(function(input, processed)
-		if processed then return end
+	UserInputService.InputBegan:Connect(function(input, gameProcessed)
+		if gameProcessed then return end
 		
-		-- I = Slime Collection
+		-- I = Inventory/Collection
 		if input.KeyCode == Enum.KeyCode.I then
 			SlimeCollectionUI.Toggle()
 		-- J = Quest Log
 		elseif input.KeyCode == Enum.KeyCode.J then
 			self:ToggleQuestLog()
-		elseif input.KeyCode == Enum.KeyCode.B then
-			InventoryUI.Toggle()
-		-- K = Slime Fabricator (during Construction phase)
+		-- K = Slime Fabricator
 		elseif input.KeyCode == Enum.KeyCode.K then
-			local SlimeFabricatorController = Knit.GetController("WordConstructorController")
-			if SlimeFabricatorController then
-				SlimeFabricatorController:Toggle()
+			local WordConstructorController = Knit.GetController("WordConstructorController")
+			if WordConstructorController then
+				WordConstructorController:Toggle()
 			end
-		-- U = Evolution UI
-		elseif input.KeyCode == Enum.KeyCode.U then
-			EvolutionUI.Show = EvolutionUI.Show or function() end
-			EvolutionUI.Show(EvolutionUI)
-		-- O = Gallery UI
-		elseif input.KeyCode == Enum.KeyCode.O then
-			GalleryUI.Show = GalleryUI.Show or function() end
-			GalleryUI.Show(GalleryUI)
 		end
 	end)
 end
@@ -521,12 +489,12 @@ end
 
 function HUDController:OnPhaseChanged(phase: string, duration: number)
 	local phaseNames = {
-		Collection = "The World Breathes in Letters",
-		Construction = "Crystallizing Meaning",
-		Quest = "Manifesting the Hero's Journey",
-		Nuisance = "The Letters Are Restless",
-		Rewards = "Resonance of Achievement",
-		Reflection = "Reflective Silence",
+		Collection = "🔮 Collect Letters",
+		Construction = "🧪 Build Words",
+		Quest = "📜 Complete Quests",
+		Nuisance = "⚡ Letters Are Loose!",
+		Rewards = "🏆 Rewards",
+		Reflection = "🌙 Rest",
 	}
 	
 	self:ShowNotification(phaseNames[phase] or phase, 3)
@@ -905,6 +873,157 @@ end
 
 function HUDController:OpenSettings()
 	self:ShowNotification("Settings coming soon!", 2)
+end
+
+-- ════════════════════════════════════════════════════════
+-- Contextual Hint System
+-- Shows gentle, state-based guidance instead of tutorial walls
+-- ════════════════════════════════════════════════════════
+function HUDController:StartHintSystem()
+	local hintShown = { crystal = false, fabricator = false, quest = false }
+	local SlimeFactory = Knit.GetService("SlimeFactory")
+	
+	-- Get the GetInventory RemoteFunction
+	local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
+	local RemotesModule = Shared:FindFirstChild("Remotes")
+	local RemotesFolder
+	if RemotesModule and RemotesModule:IsA("ModuleScript") then
+		RemotesFolder = require(RemotesModule)
+	else
+		RemotesFolder = Shared:WaitForChild("Remotes", 10)
+	end
+	local GetInventoryRF = RemotesFolder and RemotesFolder:FindFirstChild("GetInventory")
+	
+	-- Check player state periodically and show the right hint
+	task.spawn(function()
+		-- Wait for player to load in and look around
+		task.wait(8)
+		
+		while true do
+			local inventory = {}
+			local slimes = {}
+			
+			-- Get letter inventory via RemoteFunction
+			if GetInventoryRF then
+				pcall(function()
+					inventory = GetInventoryRF:InvokeServer() or {}
+				end)
+			end
+			
+			-- Get slime collection via Knit Promise
+			pcall(function()
+				local result = SlimeFactory:GetPlayerSlimes()
+				if typeof(result) == "table" and result.andThen then
+					result:andThen(function(data) slimes = data or {} end):catch(function() end)
+					task.wait(0.5) -- Give promise a moment to resolve
+				else
+					slimes = result or {}
+				end
+			end)
+			
+			-- Count total letters (inventory keys already exclude starter letters that were consumed)
+			local totalLetters = 0
+			if typeof(inventory) == "table" then
+				for _, count in pairs(inventory) do
+					totalLetters += (type(count) == "number" and count or 0)
+				end
+			end
+			
+			-- Count total slimes
+			local totalSlimes = 0
+			if typeof(slimes) == "table" then
+				for _ in pairs(slimes) do totalSlimes += 1 end
+			end
+			
+			-- Show hints based on state
+			-- Note: Players start with 16 letters from PlayerAdded, so the first useful hint
+			-- is about the fabricator, not about collecting
+			if totalLetters > 0 and totalSlimes == 0 and not hintShown.fabricator then
+				self:ShowHint("🧪 You have letters! Press [K] to open the Fabricator and spell a word!")
+				hintShown.fabricator = true
+			elseif totalLetters == 0 and totalSlimes == 0 and not hintShown.crystal then
+				self:ShowHint("💎 Walk into the glowing crystals nearby to collect letters!")
+				hintShown.crystal = true
+			elseif totalSlimes > 0 and not hintShown.quest then
+				self:ShowHint("📜 Nice slime! Walk up to an NPC and press E to get a Mad Lib quest!")
+				hintShown.quest = true
+			end
+			
+			task.wait(20) -- Check every 20 seconds
+		end
+	end)
+end
+
+function HUDController:ShowHint(text: string)
+	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+	
+	-- Find or create hint container
+	local container = playerGui:FindFirstChild("HintContainer")
+	if not container then
+		container = Instance.new("ScreenGui")
+		container.Name = "HintContainer"
+		container.ResetOnSpawn = false
+		container.IgnoreGuiInset = true
+		container.Parent = playerGui
+	end
+	
+	-- Remove existing hints
+	for _, child in ipairs(container:GetChildren()) do
+		child:Destroy()
+	end
+	
+	-- Create hint banner
+	local hint = Instance.new("Frame")
+	hint.Name = "HintBanner"
+	hint.Size = UDim2.fromOffset(500, 50)
+	hint.Position = UDim2.new(0.5, 0, 0, 80)
+	hint.AnchorPoint = Vector2.new(0.5, 0)
+	hint.BackgroundColor3 = Color3.fromRGB(20, 50, 80)
+	hint.BackgroundTransparency = 0.15
+	hint.BorderSizePixel = 0
+	hint.Parent = container
+	
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 12)
+	corner.Parent = hint
+	
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(100, 200, 255)
+	stroke.Thickness = 1.5
+	stroke.Transparency = 0.3
+	stroke.Parent = hint
+	
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, -20, 1, 0)
+	label.Position = UDim2.fromOffset(10, 0)
+	label.BackgroundTransparency = 1
+	label.TextColor3 = Color3.fromRGB(200, 230, 255)
+	label.Font = Enum.Font.GothamBold
+	label.TextSize = 15
+	label.Text = text
+	label.TextWrapped = true
+	label.Parent = hint
+	
+	-- Slide in from top
+	hint.Position = UDim2.new(0.5, 0, 0, -60)
+	TweenService:Create(hint, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+		Position = UDim2.new(0.5, 0, 0, 80)
+	}):Play()
+	
+	-- Fade out after 8 seconds
+	task.delay(8, function()
+		if hint.Parent then
+			TweenService:Create(hint, TweenInfo.new(0.5, Enum.EasingStyle.Quad), {
+				Position = UDim2.new(0.5, 0, 0, -60),
+				BackgroundTransparency = 1
+			}):Play()
+			TweenService:Create(label, TweenInfo.new(0.5), {
+				TextTransparency = 1
+			}):Play()
+			task.wait(0.6)
+			if hint.Parent then hint:Destroy() end
+		end
+	end)
 end
 
 return HUDController

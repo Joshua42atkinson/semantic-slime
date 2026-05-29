@@ -264,7 +264,6 @@ local function showAlertIndicator(slime: SlimeData)
 end
 
 function SlimeController:KnitStart()
-	self.LureService = Knit.GetService("LureService")
 	
 	-- Setup remote listener for slime spawns from server
 	slimeRemotes = ReplicatedStorage:FindFirstChild("SlimeRemotes")
@@ -299,25 +298,6 @@ function SlimeController:KnitStart()
 	-- Render Loop
 	RunService.Heartbeat:Connect(function(dt)
 		self:Update(dt)
-	end)
-	
-	-- Input Handling (Click to Lure)
-	local UserInputService = game:GetService("UserInputService")
-	
-	UserInputService.InputBegan:Connect(function(input, processed)
-		if processed then return end
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			local mouse = Players.LocalPlayer:GetMouse()
-			local target = mouse.Target
-			if target then
-				-- Check if clicked on a slime
-				local model = target:FindFirstAncestorOfClass("Model")
-				if model and model.Name:sub(1, 6) == "Slime_" then
-					local term = model.Name:sub(7)
-					self:StartLure(term, model)
-				end
-			end
-		end
 	end)
 	
 	print("[SlimeController] Started. Ready to jiggle.")
@@ -418,50 +398,8 @@ function SlimeController:DespawnSlime(id: string, captured: boolean)
 end
 
 function SlimeController:StartLure(term: string, model: Model)
-	print("Starting Lure for: " .. term)
-	
-	local LureUI = require(script.Parent.Parent.UI.LureUI)
-	
-	-- Get choices from SynonymDatabase
-	local choices, hasCorrect = SynonymDatabase.GetLureChoices(term, GameConfig.LURE_CHOICES)
-	
-	LureUI.Mount(term, choices, function(selected)
-		-- Check if correct
-		local isCorrect = SynonymDatabase.IsSynonym(term, selected)
-		
-		if isCorrect then
-			-- Send to Server
-			local LureService = Knit.GetService("LureService")
-			LureService.Client:AttemptLure(term, selected):andThen(function(result)
-				print("Lure Result: ", result)
-				if result.Success then
-					-- Find and remove local slime
-					for id, s in pairs(slimes) do
-						if s.Term:lower() == term:lower() then
-							self:DespawnSlime(id, true)
-							break
-						end
-					end
-				end
-			end)
-		else
-			print("Wrong synonym! The slime escapes.")
-			-- Make slime flee
-			for id, s in pairs(slimes) do
-				if s.Term:lower() == term:lower() then
-					s.State = "Fleeing"
-					task.delay(2, function()
-						if slimes[id] then
-							s.State = "Idle"
-						end
-					end)
-					break
-				end
-			end
-		end
-		
-		return isCorrect
-	end)
+	-- Lure system archived
+	print("[SlimeController] Clicked slime: " .. term)
 end
 
 function SlimeController:Update(dt: number)

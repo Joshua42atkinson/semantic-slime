@@ -41,6 +41,8 @@ function StoreUI.Create()
 	corner.CornerRadius = UDim.new(1, 0) -- Circle
 	corner.Parent = toggleBtn
 	
+	toggleBtn.Visible = false -- Hidden for UI Simplification
+	
 	-- 2. Main Frame (Centered)
 	local frame = Instance.new("Frame")
 	frame.Name = "ShopFrame"

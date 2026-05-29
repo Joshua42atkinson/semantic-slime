@@ -160,17 +160,17 @@ local function grantObjectiveBonus(player: Player, bonus: string)
 		else
 			warn("[GameLoopService] DataService not available for reroll token")
 		end
-	elseif bonus == "Skip Next Battle" then
-		-- Mark player as battle-skip eligible
-		if DataService then
+	elseif bonus == "Nuisance Shield" then
+		-- Grant a nuisance shield — player is immune to next nuisance wave
+		if LetterNuisanceService then
 			local success, err = pcall(function()
-				DataService:GrantBattleSkip(player)
+				LetterNuisanceService:GrantNuisanceShield(player)
 			end)
 			if not success then
-				warn("[GameLoopService] Failed to grant battle skip:", err)
+				warn("[GameLoopService] Failed to grant nuisance shield:", err)
 			end
 		else
-			warn("[GameLoopService] DataService not available for battle skip")
+			warn("[GameLoopService] LetterNuisanceService not available for nuisance shield")
 		end
 	elseif bonus == "Double Rewards" then
 		-- Mark player for double rewards
@@ -382,6 +382,29 @@ local function setPhase(newPhase: GamePhase)
 	-- Notify server scripts (via BindableEvents)
 	PhaseChangedEvent:Fire(newPhase, duration)
 	GameLoopEventEvent:Fire("PhaseStart", newPhase)
+
+	-- ═══ Phase-specific triggers ═══
+	-- Cleanup leaving Nuisance phase
+	if oldPhase == "Nuisance" and LetterNuisanceService then
+		pcall(function() LetterNuisanceService:EndNuisancePhase() end)
+	end
+
+	-- Trigger entering phase mechanics
+	if newPhase == "Collection" and CrystalService then
+		-- Respawn crystals each cycle
+		pcall(function() CrystalService:SpawnCrystals() end)
+	elseif newPhase == "Nuisance" and LetterNuisanceService then
+		-- Spawn clingy letters that chase players
+		pcall(function() LetterNuisanceService:SpawnNuisanceLetters(20) end)
+	elseif newPhase == "Rewards" and DataService then
+		-- Grant base phase-completion rewards to all players
+		for _, player in ipairs(Players:GetPlayers()) do
+			pcall(function()
+				DataService:AddXP(player, 25)
+				DataService:AddInsight(player, 5)
+			end)
+		end
+	end
 end
 
 -- Process the complete game loop
@@ -417,9 +440,7 @@ function GameLoopService.Client:CompleteWordConstruction(player: Player, word: s
 end
 
 function GameLoopService:CompleteWordConstruction(player: Player, word: string): (boolean, string?)
-	if currentPhase ~= "Construction" then
-		return false, "Cannot construct words outside Construction phase"
-	end
+	-- No phase gate — player controls the pace
 	
 	-- Check if CrystalService is available
 	if not CrystalService then
@@ -497,10 +518,7 @@ function GameLoopService.Client:StartQuest(player: Player, archetype: string?)
 end
 
 function GameLoopService:StartQuest(player: Player, archetype: string?)
-	if currentPhase ~= "Quest" then
-		warn("[GameLoopService] Can only start quests during Quest phase")
-		return nil
-	end
+	-- No phase gate — player controls the pace
 	
 	local quest = MadLibService:GenerateQuest(player, archetype)
 	if quest then

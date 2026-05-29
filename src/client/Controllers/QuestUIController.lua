@@ -246,11 +246,16 @@ local function buildQuestUI()
 end
 
 -- Update quest display
+-- NOTE: Quest slots are keyed by UUID from MadLibService but UI buttons
+-- are keyed sequentially (Slot1, Slot2, etc). We map them by index.
 local function updateQuestDisplay(quest: any)
 	if not questUI or not questUI.Parent then return end
 	
-	local titleLabel = questUI:FindFirstChild("MainFrame"):FindFirstChild("Header"):FindFirstChild("Title")
-	local descLabel = questUI:FindFirstChild("MainFrame"):FindFirstChild("Description")
+	local mainFrame = questUI:FindFirstChild("MainFrame")
+	if not mainFrame then return end
+	
+	local titleLabel = mainFrame:FindFirstChild("Header") and mainFrame.Header:FindFirstChild("Title")
+	local descLabel = mainFrame:FindFirstChild("Description")
 	
 	if titleLabel then
 		titleLabel.Text = quest.Title or "Untitled Quest"
@@ -260,28 +265,47 @@ local function updateQuestDisplay(quest: any)
 		descLabel.Text = quest.DramaticSituation or "No description available."
 	end
 	
-	-- Update slots
+	-- Hide all slot buttons first
+	for i = 1, 4 do
+		local btn = slotButtons["Slot" .. i]
+		if btn then btn.Visible = false end
+	end
+	
+	-- Map UUID-keyed slots to sequential buttons
 	if quest.Slots then
+		local slotIndex = 1
 		for slotId, slotData in pairs(quest.Slots) do
-			local slotButton = slotButtons[slotId]
+			local slotButton = slotButtons["Slot" .. slotIndex]
 			if slotButton then
+				slotButton.Visible = true
+				-- Store the real UUID so click handlers can reference it
+				slotButton:SetAttribute("SlotId", slotId)
+				
 				local typeLabel = slotButton:FindFirstChild("TypeLabel")
 				local contentLabel = slotButton:FindFirstChild("ContentLabel")
 				
 				if typeLabel then
-					typeLabel.Text = slotData.SlotType or "UNKNOWN"
+					local displayType = slotData.SlotType or "WORD"
+					if slotData.TargetMorpheme then
+						displayType = displayType .. " (with " .. slotData.TargetMorpheme .. ")"
+					end
+					typeLabel.Text = displayType
 				end
 				
 				if contentLabel then
 					if slotData.PlayerEntry then
 						contentLabel.Text = slotData.PlayerEntry
 						contentLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+						slotButton.BackgroundColor3 = Color3.fromRGB(30, 70, 40)
 					else
-						contentLabel.Text = "Empty"
-						contentLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+						contentLabel.Text = "⬜ Click to type a word"
+						contentLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+						slotButton.BackgroundColor3 = Color3.fromRGB(40, 50, 70)
 					end
 				end
 			end
+			slotIndex += 1
+			if slotIndex > 4 then break end
 		end
 	end
 end
@@ -332,38 +356,91 @@ local function hideQuestUI()
 	selectedSlime = nil
 end
 
--- Handle slot clicks
-local function onSlotClicked(slotId: string)
+-- Handle slot clicks — opens a text input popup so the player can type a word
+local function onSlotClicked(slotButtonKey: string)
 	if not isQuestActive or not currentQuest then return end
 	
-	if selectedSlime then
-		-- Try to fill the slot
-		local success, result = pcall(function()
-			return MadLibService:FillQuestSlot(Players.LocalPlayer, currentQuest.QuestId, slotId, selectedSlime)
-		end)
-		
-		if success and result then
-			questSounds.slotFill:Play()
-			print("[QuestUIController] Filled slot:", slotId, "with slime:", selectedSlime)
-			
-			-- Update display
-			local slotData = currentQuest.Slots[slotId]
-			if slotData then
-				slotData.PlayerEntry = selectedSlime
-				slotData.InstanceId = selectedSlime
-				updateQuestDisplay(currentQuest)
-			end
-		else
-			questSounds.error:Play()
-			warn("[QuestUIController] Failed to fill slot:", result)
+	local slotButton = slotButtons[slotButtonKey]
+	if not slotButton then return end
+	
+	-- Get the real UUID from the attribute we stored
+	local realSlotId = slotButton:GetAttribute("SlotId")
+	if not realSlotId then return end
+	
+	-- Don't allow re-filling
+	local slotData = currentQuest.Slots[realSlotId]
+	if slotData and slotData.PlayerEntry then return end
+	
+	-- Create a text input popup inside the slot button
+	local existing = slotButton:FindFirstChild("WordInput")
+	if existing then existing:Destroy() end
+	
+	local input = Instance.new("TextBox")
+	input.Name = "WordInput"
+	input.Size = UDim2.new(1, -20, 0, 28)
+	input.Position = UDim2.fromOffset(10, 40)
+	input.BackgroundColor3 = Color3.fromRGB(15, 20, 40)
+	input.TextColor3 = Color3.fromRGB(255, 220, 100)
+	input.PlaceholderText = "Type a word..."
+	input.PlaceholderColor3 = Color3.fromRGB(120, 120, 160)
+	input.Font = Enum.Font.GothamBold
+	input.TextSize = 16
+	input.ClearTextOnFocus = true
+	input.BorderSizePixel = 0
+	input.Parent = slotButton
+	
+	local inputCorner = Instance.new("UICorner")
+	inputCorner.CornerRadius = UDim.new(0, 6)
+	inputCorner.Parent = input
+	
+	input:CaptureFocus()
+	
+	input.FocusLost:Connect(function(enterPressed)
+		if not enterPressed or input.Text == "" then
+			input:Destroy()
+			return
 		end
 		
-		selectedSlime = nil
-	else
-		-- Select a slime (would need slime selection UI)
-		questSounds.error:Play()
-		print("[QuestUIController] No slime selected")
-	end
+		local word = input.Text:lower()
+		input:Destroy()
+		
+		-- Send to server
+		local fillSuccess, fillResult = pcall(function()
+			return MadLibService:FillQuestSlot(
+				Players.LocalPlayer,
+				currentQuest.QuestId,
+				realSlotId,
+				word
+			)
+		end)
+		
+		if fillSuccess and fillResult then
+			questSounds.slotFill:Play()
+			print("[QuestUIController] Filled slot with word:", word)
+			
+			-- Update local quest data and refresh display
+			if slotData then
+				slotData.PlayerEntry = word
+			end
+			updateQuestDisplay(currentQuest)
+		else
+			questSounds.error:Play()
+			-- Show error feedback on the slot
+			local contentLabel = slotButton:FindFirstChild("ContentLabel")
+			if contentLabel then
+				local errorMsg = (type(fillResult) == "string") and fillResult or "Try a different word!"
+				contentLabel.Text = "❌ " .. errorMsg
+				contentLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+				task.delay(2, function()
+					if contentLabel.Parent then
+						contentLabel.Text = "⬜ Click to type a word"
+						contentLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+					end
+				end)
+			end
+			warn("[QuestUIController] Failed to fill slot:", fillResult)
+		end
+	end)
 end
 
 -- Attempt quest completion
@@ -438,11 +515,9 @@ local function connectToServices()
 	if success and service then
 		GameLoopService = service
 		
-		-- Listen for phase changes
+		-- Phase changes are informational — don't auto-hide quest UI
 		GameLoopService.PhaseChanged:Connect(function(phase)
-			if phase ~= "Quest" then
-				hideQuestUI()
-			end
+			print("[QuestUIController] Phase changed to:", phase)
 		end)
 	else
 		warn("[QuestUIController] GameLoopService not available")

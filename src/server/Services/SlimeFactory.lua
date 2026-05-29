@@ -382,6 +382,17 @@ function SlimeFactory.Client:SetCompanion(player: Player, instanceId: string)
 	return self.Server:SetCompanion(player, instanceId)
 end
 
+function SlimeFactory.Client:GetAvailableEvolutions(player: Player, instanceId: string)
+	if type(instanceId) ~= "string" then return {} end
+	return self.Server:GetAvailableEvolutions(player, instanceId)
+end
+
+function SlimeFactory.Client:EvolveSlime(player: Player, instanceId: string, evolutionType: string, additionalWord: string?)
+	if type(instanceId) ~= "string" or type(evolutionType) ~= "string" then return false, "Invalid input" end
+	if additionalWord and type(additionalWord) ~= "string" then return false, "Invalid additional word" end
+	return self.Server:EvolveSlime(player, instanceId, evolutionType, additionalWord)
+end
+
 function SlimeFactory:KnitStart()
 	print("[SlimeFactory] Started.")
 end
@@ -399,7 +410,7 @@ function SlimeFactory:CreateSlime(player: Player, word: string): (SlimeInstance?
 	
 	word = word:lower()
 	
-	-- Validate it's a real word (check in WordDatabase or basic validation)
+	-- Validate it's a real word (check in WordDatabase or basic length check)
 	local isValidWord
 	local wordCheckSuccess, wordCheckResult = pcall(function()
 		return WordDatabase[word] ~= nil or #word >= 3
@@ -413,13 +424,7 @@ function SlimeFactory:CreateSlime(player: Player, word: string): (SlimeInstance?
 	isValidWord = wordCheckResult
 	
 	if not isValidWord then
-		local FeralTypoService = Knit.GetService("FeralTypoService")
-		if FeralTypoService then
-			pcall(function()
-				FeralTypoService:SpawnTypo(player, word)
-			end)
-		end
-		return nil, "That doesn't look like a real word! A Feral Typo has spawned!"
+		return nil, "Word must be at least 3 letters!"
 	end
 	
 	-- Add to player's collection
@@ -515,21 +520,21 @@ function SlimeFactory:CreateSlime(player: Player, word: string): (SlimeInstance?
 	
 	playerSlimes[player][slime.InstanceId] = slime
 	
-	-- Notification to Ontological Mirror
-	local OntoMirror = Knit.GetService("OntologicalMirrorService")
-	if OntoMirror then
-		pcall(function()
+	-- Notification to Ontological Mirror (may be archived)
+	pcall(function()
+		local OntoMirror = Knit.GetService("OntologicalMirrorService")
+		if OntoMirror then
 			OntoMirror:RecordWord(player, slime.WordId, slime.Stats, slime.Element)
-		end)
-	end
+		end
+	end)
 	
-	-- Notification to Semantic Zeitgeist
-	local ZeitgeistService = Knit.GetService("ZeitgeistService")
-	if ZeitgeistService then
-		pcall(function()
+	-- Notification to Semantic Zeitgeist (may be archived)
+	pcall(function()
+		local ZeitgeistService = Knit.GetService("ZeitgeistService")
+		if ZeitgeistService then
 			ZeitgeistService:RecordSemanticEvent("Creation", slime.Element, slime.WordId)
-		end)
-	end
+		end
+	end)
 	
 	-- Notify client
 	self.Client.SlimeCreated:Fire(player, slime)
@@ -644,8 +649,8 @@ function SlimeFactory:AddXP(player: Player, instanceId: string, amount: number):
 		slime.XP -= xpReq
 		slime.Level += 1
 		
-		-- Recalculate stats with new level
-		local newStats = calculateStats(slime.Root, slime.Role, slime.Level)
+		-- Recalculate stats with new level (rarity, role, level, root, suffix)
+		local newStats = calculateStats(slime.Rarity, slime.Role, slime.Level, slime.Root, slime.Suffix or "")
 		newStats = applyRarityMultiplier(newStats, slime.Rarity)
 		slime.Stats = newStats
 		

@@ -20,7 +20,7 @@ local VISUAL_EFFECT_DURATION = 2
 local COLLECTION_COOLDOWN = 0.5
 
 -- State
-local isEnabled = false
+local isEnabled = true  -- Always enabled — player controls their own pace
 local lastCollectionTime = 0
 local nearbyCrystals = {}
 local collectionEffects = {}
@@ -31,8 +31,8 @@ local screenGui: ScreenGui? = nil
 local collectionIndicator: Frame? = nil
 local rangeIndicator: Frame? = nil
 
--- Services
-local CrystalService: any = nil
+-- Services / Remotes
+local CollectCrystalRF: RemoteFunction? = nil
 local GameLoopService: any = nil
 
 -- Sound effects setup
@@ -256,7 +256,8 @@ local function attemptAutoCollection()
 		if crystal.Distance <= AUTO_COLLECT_RANGE then
 			-- Try to collect the crystal
 			local success, result = pcall(function()
-				return CrystalService:CollectCrystal(player, crystal.Model.Name)
+				local crystalId = crystal.Model.Name:gsub("^Crystal_", "")
+				return CollectCrystalRF:InvokeServer(crystalId)
 			end)
 			
 			if success and result then
@@ -312,7 +313,8 @@ local function attemptCollection(targetCrystal: Model?)
 	
 	if crystalToCollect then
 		local success, result = pcall(function()
-			return CrystalService:CollectCrystal(player, crystalToCollect.Name)
+			local crystalId = crystalToCollect.Name:gsub("^Crystal_", "")
+			return CollectCrystalRF:InvokeServer(crystalId)
 		end)
 		
 		if success and result then
@@ -357,43 +359,55 @@ end
 
 -- Service connections
 local function connectToServices()
-	-- Get CrystalService
+	-- Get CollectCrystal RemoteFunction
+	local Shared = ReplicatedStorage:WaitForChild("Shared")
+	local RemotesModule = Shared:FindFirstChild("Remotes")
+	local RemotesFolder
+	if RemotesModule and RemotesModule:IsA("ModuleScript") then
+		RemotesFolder = require(RemotesModule)
+	else
+		RemotesFolder = Shared:WaitForChild("Remotes", 10)
+	end
+	
+	if RemotesFolder then
+		CollectCrystalRF = RemotesFolder:FindFirstChild("CollectCrystal")
+		if CollectCrystalRF then
+			print("[CrystalCollectorController] CollectCrystal remote found")
+		else
+			warn("[CrystalCollectorController] CollectCrystal remote NOT found")
+		end
+	else
+		warn("[CrystalCollectorController] Remotes folder not found")
+	end
+	
+	-- Get CrystalService for event signals
 	local success, service = pcall(function()
 		return Knit.GetService("CrystalService")
 	end)
 	
 	if success and service then
-		CrystalService = service
-		
-		-- Connect to crystal events
-		CrystalService.CrystalCollected:Connect(function(letter, rarity)
+		-- Connect to crystal events for UI feedback
+		service.CrystalCollected:Connect(function(letter, rarity)
+			showCollectionFeedback(letter, rarity)
 			print("[CrystalCollectorController] Crystal collected:", letter, rarity)
 		end)
 		
-		CrystalService.CrystalSpawned:Connect(function(crystalId, letter, position, rarity)
+		service.CrystalSpawned:Connect(function(crystalId, letter, position, rarity)
 			print("[CrystalCollectorController] Crystal spawned:", letter)
 		end)
 	else
 		warn("[CrystalCollectorController] CrystalService not available")
 	end
 	
-	-- Get GameLoopService
-	local success, service = pcall(function()
+	-- GameLoopService — phase changes are informational, collection always enabled
+	local glSuccess, glService = pcall(function()
 		return Knit.GetService("GameLoopService")
 	end)
 	
-	if success and service then
-		GameLoopService = service
-		
-		-- Listen for phase changes
+	if glSuccess and glService then
+		GameLoopService = glService
 		GameLoopService.PhaseChanged:Connect(function(phase)
-			isEnabled = (phase == "Collection")
-			if not isEnabled then
-				-- Hide UI when not in collection phase
-				if rangeIndicator then
-					rangeIndicator.BackgroundTransparency = 1
-				end
-			end
+			print("[CrystalCollectorController] Phase:", phase)
 		end)
 	else
 		warn("[CrystalCollectorController] GameLoopService not available")
@@ -452,6 +466,24 @@ function CrystalCollectorController:SetEnabled(enabled: boolean)
 	if not enabled and rangeIndicator then
 		rangeIndicator.BackgroundTransparency = 1
 	end
+end
+
+function CrystalCollectorController:GetInventory()
+	-- Provide inventory access for InventoryUI
+	local Shared = ReplicatedStorage:WaitForChild("Shared")
+	local RemotesModule = Shared:FindFirstChild("Remotes")
+	local RemotesFolder
+	if RemotesModule and RemotesModule:IsA("ModuleScript") then
+		RemotesFolder = require(RemotesModule)
+	else
+		RemotesFolder = Shared:WaitForChild("Remotes", 10)
+	end
+	local GetInventoryRF = RemotesFolder and RemotesFolder:FindFirstChild("GetInventory")
+	if GetInventoryRF then
+		local ok, result = pcall(function() return GetInventoryRF:InvokeServer() end)
+		if ok then return result end
+	end
+	return {}
 end
 
 function CrystalCollectorController:GetNearbyCrystalCount(): number

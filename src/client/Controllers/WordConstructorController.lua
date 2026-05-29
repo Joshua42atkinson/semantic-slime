@@ -389,13 +389,12 @@ end
 function WordConstructorController:KnitStart()
 	print("[WordConstructorController] Started.")
 
-	-- Listen for Construction phase
+	-- Phase changes are now informational — player controls fabricator via K key
 	local GameLoopService = Knit.GetService("GameLoopService")
 	GameLoopService.PhaseChanged:Connect(function(phase, _)
 		if phase == "Construction" then
-			self:Show()
-		else
-			self:Hide()
+			-- Nudge the player, but don't force-open
+			print("[WordConstructorController] Construction phase — press K to build a word!")
 		end
 	end)
 
@@ -435,6 +434,44 @@ function WordConstructorController:Show()
 			)
 		end
 	end)
+
+	-- Sync inventory from server
+	local function syncInventory()
+		local remotesMod = ReplicatedStorage:WaitForChild("Shared"):FindFirstChild("Remotes")
+		local remotes = (remotesMod and remotesMod:IsA("ModuleScript")) and require(remotesMod) or ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Remotes", 10)
+		local getInventoryRF = remotes and remotes:FindFirstChild("GetInventory")
+		
+		if getInventoryRF then
+			task.spawn(function()
+				local inventory = getInventoryRF:InvokeServer() or {}
+				if screenGui then
+					local main = screenGui:FindFirstChild("MainFrame")
+					local invFrame = main and main:FindFirstChild("InventoryFrame")
+					if invFrame then
+						for letter, count in pairs(inventory) do
+							local btn = invFrame:FindFirstChild("Letter_" .. letter)
+							if btn then
+								-- If count is > 0, make it bright, else make it dim
+								if count > 0 then
+									btn.BackgroundColor3 = Color3.fromRGB(30, 38, 80)
+									btn.TextTransparency = 0
+									btn.Text = letter .. "\n" .. "<font size='10'>" .. count .. "</font>"
+									btn.RichText = true
+								else
+									btn.BackgroundColor3 = Color3.fromRGB(20, 24, 40)
+									btn.TextTransparency = 0.6
+									btn.Text = letter
+									btn.RichText = false
+								end
+							end
+						end
+					end
+				end
+			end)
+		end
+	end
+	
+	syncInventory()
 
 	-- Show current word state
 	updateWordDisplay()
@@ -494,33 +531,66 @@ function WordConstructorController:SubmitWord()
 		return
 	end
 
-	-- Get GameLoopService with error handling
-	local gameLoopSuccess, GameLoopService = pcall(function()
+	-- Complete word construction via Knit service proxy
+	-- Knit client proxies return a Promise wrapping the server's return values
+	local GameLoopService
+	local getSuccess, getResult = pcall(function()
 		return Knit.GetService("GameLoopService")
 	end)
 	
-	if not gameLoopSuccess or not GameLoopService then
+	if not getSuccess or not getResult then
 		warn("[WordConstructorController] GameLoopService not available")
-		if wordLabel then
-			wordLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-		end
+		if wordLabel then wordLabel.TextColor3 = Color3.fromRGB(255, 80, 80) end
 		return
 	end
+	GameLoopService = getResult
 	
-	-- Complete word construction with error handling
-	local completeSuccess, completeResult = pcall(function()
+	local callSuccess, callResult = pcall(function()
 		return GameLoopService:CompleteWordConstruction(currentWord)
 	end)
 	
-	if not completeSuccess then
-		warn("[WordConstructorController] Error calling CompleteWordConstruction:", completeResult)
-		if wordLabel then
-			wordLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-		end
+	if not callSuccess then
+		warn("[WordConstructorController] Error calling CompleteWordConstruction:", callResult)
+		if wordLabel then wordLabel.TextColor3 = Color3.fromRGB(255, 80, 80) end
 		return
 	end
 	
-	completeResult:andThen(function(success)
+	-- Knit returns a Promise from service calls
+	if typeof(callResult) == "table" and callResult.andThen then
+		-- It's a promise
+		callResult:andThen(function(success, errorMsg)
+			if success then
+				if wordLabel then wordLabel.TextColor3 = Color3.fromRGB(100, 255, 100) end
+				print("[WordConstructorController] Fabricated slime: " .. currentWord)
+				
+				-- Play visual effect here if we had one
+				local SoundController = Knit.GetController("SoundController")
+				if SoundController then SoundController:Play("Victory") end
+				
+				task.delay(0.8, function()
+					self:ClearWord()
+					if wordLabel then wordLabel.TextColor3 = Color3.fromRGB(255, 210, 50) end
+					-- It would be better to sync inventory here, but syncInventory is local to Show().
+					-- To fix this, we will just re-hide and show to force a sync if needed, or close the UI.
+					-- A simpler way is to close the UI after a successful construction.
+					self:Hide()
+				end)
+			else
+				warn("[WordConstructorController] Construction failed:", errorMsg)
+				if wordLabel then
+					wordLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+					task.delay(0.5, function()
+						if wordLabel then wordLabel.TextColor3 = Color3.fromRGB(255, 210, 50) end
+					end)
+				end
+			end
+		end):catch(function(err)
+			warn("[WordConstructorController] Promise rejected:", tostring(err))
+			if wordLabel then wordLabel.TextColor3 = Color3.fromRGB(255, 80, 80) end
+		end)
+	else
+		-- Raw return value (fallback)
+		local success = callResult
 		if success then
 			if wordLabel then wordLabel.TextColor3 = Color3.fromRGB(100, 255, 100) end
 			print("[WordConstructorController] Fabricated slime: " .. currentWord)
@@ -536,12 +606,7 @@ function WordConstructorController:SubmitWord()
 				end)
 			end
 		end
-	end):catch(function(err)
-		warn("[WordConstructorController] Failed to construct word: " .. tostring(err))
-		if wordLabel then
-			wordLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-		end
-	end)
+	end
 end
 
 return WordConstructorController

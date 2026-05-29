@@ -17,12 +17,7 @@ local isOpen = false
 local achievementCards = {}
 
 function AchievementUI.Initialize()
-    UserInputService.InputBegan:Connect(function(input, processed)
-        if processed then return end
-        if input.KeyCode == Enum.KeyCode.Y then -- Y for achievements
-            AchievementUI.Toggle()
-        end
-    end)
+    print("[AchievementUI] Initialized")
 end
 
 function AchievementUI.Toggle()

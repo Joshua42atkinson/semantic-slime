@@ -63,10 +63,10 @@ local TUTORIAL_STEPS: { TutorialStep } = {
 		Action = "Accept a quest",
 	},
 	{
-		Title = "Battle for Slots",
-		Message = "When multiple players want the same quest slot, you'll battle! Use Attack, Defend, or semantic wordplay to win!",
-		Highlight = "Battle",
-		Action = "Win a battle",
+		Title = "Fend Off Nuisances!",
+		Message = "Clingy letters from the Nuisance phase will chase you! Shake them off to earn bonus crystals and protect your inventory.",
+		Highlight = "Nuisance",
+		Action = "Survive a wave",
 	},
 	{
 		Title = "You're Ready!",

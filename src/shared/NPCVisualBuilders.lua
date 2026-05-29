@@ -49,7 +49,7 @@ local function addBillboardName(hrp: Part, name: string, archetype: string, colo
 	bGui.StudsOffset = Vector3.new(0, 3, 0)
 	bGui.Adornee = hrp
 	bGui.AlwaysOnTop = false
-	bGui.MaxDistance = 60
+	bGui.MaxDistance = 25 -- Reduced from 60 to prevent overlapping clutter
 	bGui.Parent = hrp
 
 	local label = Instance.new("TextLabel")

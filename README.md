@@ -2,7 +2,7 @@
 
 > **An educational MMO-RPG where words become living creatures.**
 
-Semantic Slime is a Roblox game where players explore **Syllable Springs** — a world built from Jungian archetypes — to catch **Etymons** (word-slimes). Each slime is born from real etymology: its root determines its element, its suffix determines its combat role. Players collect letter crystals, build words, and use their slimes to solve Mad-Lib quests and battle for meaning.
+Semantic Slime is a Roblox game where players explore **Syllable Springs** — a world built from Jungian archetypes — to catch **Etymons** (word-slimes). Each slime is born from real etymology: its root determines its element, its suffix determines its role. Players collect letter crystals, build words, and use their slimes to solve Mad-Lib quests and fend off clingy letter nuisances.
 
 **Platform:** Roblox (PC/Mobile)  
 **Target Audience:** Ages 12–18  
@@ -14,7 +14,7 @@ Semantic Slime is a Roblox game where players explore **Syllable Springs** — a
 ## 🎮 Core Game Loop
 
 ```
-COLLECT letter crystals → BUILD words → CATCH slimes → QUEST with Mad-Libs → BATTLE for slots
+COLLECT letter crystals → BUILD words → CATCH slimes → QUEST with Mad-Libs → SURVIVE nuisances
          ↑                                                                         │
          └─────────────────── EVOLVE & MASTER ─────────────────────────────────────┘
 ```
@@ -23,7 +23,7 @@ COLLECT letter crystals → BUILD words → CATCH slimes → QUEST with Mad-Libs
 1. **Collection** — Explore districts, gather A–Z crystals (rarity: common → mythic)
 2. **Construction** — Spell words in the Word Constructor; valid words spawn Etymon slimes
 3. **Quest** — Talk to archetypal NPCs, fill Mad-Lib slots with your slimes
-4. **Battle** — Turn-based PvP when players compete for the same quest slot
+4. **Nuisance** — Clingy letters chase players, cling to them, and feed the alphabet inventory
 5. **Rewards** — XP, Insight currency, Evolution Points
 
 ---

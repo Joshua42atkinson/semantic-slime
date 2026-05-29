@@ -61,21 +61,28 @@ function OntologicalMirrorService:KnitStart()
 	-- We listen to the SlimeFactory. Every time a word is born, the Mirror watches.
 	local SlimeFactory = Knit.GetService("SlimeFactory")
 	if SlimeFactory then
-		-- Assuming SlimeFactory has an event or we can hook into it.
-		-- For the sake of the engine, we expose a public method for SlimeFactory to call.
+		-- SlimeFactory calls OntologicalMirrorService:RecordWord() directly.
 	end
 
 	-- Connect to the GameLoop. When Night falls, The Void opens.
-	local GameLoopService = Knit.GetService("GameLoopService")
-	if GameLoopService then
-		GameLoopService.PhaseChanged:Connect(function(newPhase)
-			if newPhase == "Night" or newPhase == "Reflection" then
-				self:TriggerServerWideReflection()
-			elseif activeReflections[Players:GetPlayers()[1]] and newPhase == "Collection" then
-				self:EndServerWideReflection()
-			end
+	-- Use task.defer to ensure GameLoopService's BindableEvents are fully initialized.
+	task.defer(function()
+		local ok, GameLoopService = pcall(function()
+			return Knit.GetService("GameLoopService")
 		end)
-	end
+		if ok and GameLoopService and GameLoopService.PhaseChanged then
+			GameLoopService.PhaseChanged:Connect(function(newPhase)
+				if newPhase == "Rewards" or newPhase == "Night" or newPhase == "Reflection" then
+					self:TriggerServerWideReflection()
+				elseif newPhase == "Collection" then
+					self:EndServerWideReflection()
+				end
+			end)
+			print("[OntologicalMirrorService] Connected to GameLoopService.PhaseChanged")
+		else
+			warn("[OntologicalMirrorService] GameLoopService not available — The Void won't auto-trigger")
+		end
+	end)
 	
 	-- When the client submits their reflection
 	self.Client.SubmitReflection:Connect(function(player, responseText)

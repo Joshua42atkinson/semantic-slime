@@ -18,7 +18,7 @@ local PerformanceMonitor = Knit.CreateService {
 }
 
 -- Configuration
-local UPDATE_INTERVAL = 5 -- seconds
+local UPDATE_INTERVAL = 30 -- seconds
 local MEMORY_WARNING_THRESHOLD = 500 -- MB
 local FPS_WARNING_THRESHOLD = 30
 local PLAYER_COUNT_WARNING = 100
@@ -41,8 +41,6 @@ local serviceStatus = {
     CrystalService = "Unknown", 
     SlimeFactory = "Unknown",
     MadLibService = "Unknown",
-
-    DataBridgeService = "Unknown",
 }
 
 -- Private functions

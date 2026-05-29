@@ -935,6 +935,20 @@ function MadLibService:GetSlotSuggestions(player: Player, slotType: string): { a
 	return suggestions
 end
 
+-- Client-facing methods for quest slot filling
+function MadLibService.Client:FillQuestSlot(player: Player, questId: string, slotId: string, wordEntry: string): (boolean, string?)
+	if type(questId) ~= "string" or type(slotId) ~= "string" or type(wordEntry) ~= "string" then
+		return false, "Invalid input"
+	end
+	return self.Server:FillSlot(player, questId, slotId, "", wordEntry)
+end
+
+function MadLibService.Client:CompleteQuest(player: Player): (any?)
+	local quest = self.Server:GetPlayerQuest(player)
+	if not quest then return nil end
+	return self.Server:CompleteQuest(player, quest.QuestId)
+end
+
 function MadLibService:KnitStart()
 	print("[MadLibService] Started.")
 end

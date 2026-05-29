@@ -189,13 +189,38 @@ function InventoryUI.Hide()
 end
 
 function InventoryUI.RefreshInventory()
-	-- Get inventory from CrystalCollector
-	local CrystalCollector = Knit.GetController("CrystalCollector")
-	if CrystalCollector and CrystalCollector.GetInventory then
-		inventoryData = CrystalCollector:GetInventory()
+	-- Get inventory from CrystalCollectorController
+	local CrystalCollectorController = Knit.GetController("CrystalCollectorController")
+	if CrystalCollectorController and CrystalCollectorController.GetInventory then
+		local ok, result = pcall(function()
+			return CrystalCollectorController:GetInventory()
+		end)
+		if ok and result then
+			inventoryData = result
+		else
+			inventoryData = {}
+		end
 	else
-		-- Fallback: empty inventory
-		inventoryData = {}
+		-- Fallback: use RemoteFunction directly
+		local Shared = game:GetService("ReplicatedStorage"):WaitForChild("Shared")
+		local RemotesModule = Shared:FindFirstChild("Remotes")
+		local RemotesFolder
+		if RemotesModule and RemotesModule:IsA("ModuleScript") then
+			RemotesFolder = require(RemotesModule)
+		else
+			RemotesFolder = Shared:WaitForChild("Remotes", 10)
+		end
+		local GetInventoryRF = RemotesFolder and RemotesFolder:FindFirstChild("GetInventory")
+		if GetInventoryRF then
+			local ok, result = pcall(function() return GetInventoryRF:InvokeServer() end)
+			if ok and result then
+				inventoryData = result
+			else
+				inventoryData = {}
+			end
+		else
+			inventoryData = {}
+		end
 	end
 end
 
@@ -273,15 +298,13 @@ end
 function InventoryUI.Initialize()
 	-- Listen for inventory updates
 	local CrystalService = Knit.GetService("CrystalService")
-	CrystalService.Client.CrystalCollected:Connect(function(player, letter, rarity)
-		-- Refresh if it's our player
-		if player == Players.LocalPlayer then
-			InventoryUI.RefreshInventory()
-			if isOpen and inventoryScreen then
-				local gridContainer = inventoryScreen:FindFirstChild("LetterGrid", true)
-				if gridContainer then
-					InventoryUI.PopulateLetters(gridContainer)
-				end
+	CrystalService.CrystalCollected:Connect(function(letter, rarity)
+		-- Knit strips the player arg on client — this always fires for the local player
+		InventoryUI.RefreshInventory()
+		if isOpen and inventoryScreen then
+			local gridContainer = inventoryScreen:FindFirstChild("LetterGrid", true)
+			if gridContainer then
+				InventoryUI.PopulateLetters(gridContainer)
 			end
 		end
 	end)

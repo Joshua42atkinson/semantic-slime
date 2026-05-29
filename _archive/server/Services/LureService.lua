@@ -9,7 +9,16 @@ local Players = game:GetService("Players")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Knit = require(Packages:WaitForChild("Knit"))
 
-local SynonymDatabase = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("SynonymDatabase"))
+-- Lazy-load SynonymDatabase to avoid +7MB memory spike at boot
+-- (67,167-line / 1.5MB file — deferred until first use)
+local SynonymDatabase
+local function getSynonymDB()
+	if not SynonymDatabase then
+		SynonymDatabase = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("SynonymDatabase"))
+		print("[LureService] SynonymDatabase loaded on first use")
+	end
+	return SynonymDatabase
+end
 local GameConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("GameConfig"))
 
 local LureService = Knit.CreateService {
@@ -42,7 +51,7 @@ function LureService:ProcessLure(player: Player, targetTerm: string, usedWord: s
     end
     
     -- Check if this is a valid synonym using SynonymDatabase
-    local isMatch = SynonymDatabase.IsSynonym(targetTerm, usedWord)
+    local isMatch = getSynonymDB().IsSynonym(targetTerm, usedWord)
     
     if isMatch then
         -- Capture Success!
@@ -56,7 +65,7 @@ function LureService:ProcessLure(player: Player, targetTerm: string, usedWord: s
         SpawnerService:CaptureSlime(player, targetTerm)
         
         -- Calculate XP bonus based on difficulty
-        local difficulty = SynonymDatabase.GetDifficulty(targetTerm) or 1
+        local difficulty = getSynonymDB().GetDifficulty(targetTerm) or 1
         local baseXP = 10
         local xpGained = baseXP * difficulty
         
@@ -69,7 +78,7 @@ function LureService:ProcessLure(player: Player, targetTerm: string, usedWord: s
             end
         end
         
-        local element = SynonymDatabase.GetElement(targetTerm) or "Normal"
+        local element = getSynonymDB().GetElement(targetTerm) or "Normal"
         local emoji = GameConfig.Elements[element] and GameConfig.Elements[element].Emoji or "✨"
         
         print(string.format("[LureService] %s captured %s! (+%d XP)", player.Name, targetTerm, xpGained))
@@ -89,7 +98,7 @@ function LureService:ProcessLure(player: Player, targetTerm: string, usedWord: s
         }
     else
         -- Check if it was an antonym (critical fail)
-        local entry = SynonymDatabase[targetTerm:lower()]
+        local entry = getSynonymDB()[targetTerm:lower()]
         local isAntonym = false
         
         if entry and entry.Antonyms then
@@ -120,14 +129,14 @@ end
 -- Get lure choices for a word (server-authoritative for anti-cheat)
 function LureService.Client:GetLureChoices(player: Player, term: string)
 	if type(term) ~= "string" then return {}, false end
-    local choices, hasCorrect = SynonymDatabase.GetLureChoices(term, GameConfig.LURE_CHOICES)
+    local choices, hasCorrect = getSynonymDB().GetLureChoices(term, GameConfig.LURE_CHOICES)
     return choices, hasCorrect
 end
 
 -- Server-side spawn trigger (called by SpawnerService or admin)
 function LureService:SpawnWildSlime(term: string, position: Vector3, element: string?)
     local id = HttpService:GenerateGUID(false)
-    local wordElement = element or SynonymDatabase.GetElement(term) or "Normal"
+    local wordElement = element or getSynonymDB().GetElement(term) or "Normal"
     
     self.Client.SlimeSpawned:FireAll(id, term, position, wordElement)
     print("[LureService] Broadcast spawn: " .. term .. " (" .. wordElement .. ")")
@@ -138,7 +147,7 @@ end
 -- Get word info for UI
 function LureService.Client:GetWordInfo(player: Player, term: string)
 	if type(term) ~= "string" then return nil end
-    local entry = SynonymDatabase[term:lower()]
+    local entry = getSynonymDB()[term:lower()]
     if not entry then
         return nil
     end

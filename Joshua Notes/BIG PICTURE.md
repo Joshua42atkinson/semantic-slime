@@ -6,15 +6,15 @@
 ### What Players Do:
 1. Collect letter crystals
 2. Build words from letters  
-3. Words become "slimes" that fight
+3. Words become "slimes" (pet companions)
 4. Complete quests with slimes
-5. Battle other players
+5. Survive nuisance letter waves
 
 ### Why It's Cool:
 - Learn vocabulary while playing
 - Social multiplayer fun
 - Beautiful world to explore
-- Strategic battles
+- Strategic word puzzles
 
 ### Our Goal:
 Make learning words fun, not boring!
@@ -31,7 +31,7 @@ Make learning words fun, not boring!
 2. **Core Gameplay** (5% done)
    - Crystal collection
    - Word building
-   - Fighting system
+   - Nuisance system
    - Quest system
 
 3. **World Design** (0% done)

@@ -388,7 +388,7 @@ function TutorialUI.Initialize()
 				
 				if profile and not profile.TutorialCompleted and slimeCount == 0 then
 					task.wait(3) -- Small delay for player to get oriented
-					TutorialUI.Show()
+					-- TutorialUI.Show() -- Disabled for UI Simplification
 				end
 			end):catch(warn)
 		end):catch(warn)

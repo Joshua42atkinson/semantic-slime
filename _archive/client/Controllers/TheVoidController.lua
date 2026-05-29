@@ -113,7 +113,7 @@ function TheVoidController:ShatterReality()
 	char:SetPrimaryPartCFrame(CFrame.new(0, -4995, 0))
 	
 	cc.Brightness = 0
-	Debris(cc, 1)
+	game:GetService("Debris"):AddItem(cc, 1)
 
 	-- Lock movement
 	local humanoid = char:FindFirstChildOfClass("Humanoid")
@@ -223,11 +223,6 @@ function TheVoidController:RestoreReality()
 	
 	inVoid = false
 	print("[TheVoidController] ☀️ Reality restored.")
-end
-
--- Polyfill for Debris since we don't have exactly game.Debris in standard lua scope
-function Debris(item, time)
-	game:GetService("Debris"):AddItem(item, time)
 end
 
 return TheVoidController

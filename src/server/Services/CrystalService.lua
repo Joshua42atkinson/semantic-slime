@@ -220,7 +220,7 @@ local function createCrystalModel(crystal: LetterCrystal): Model
 	part.Color = RARITY_COLORS[crystal.Rarity]
 	part.Transparency = 0.3
 	part.Anchored = true
-	part.CanCollide = true
+	part.CanCollide = false  -- Let players walk through to auto-collect
 	part.Position = crystal.Position
 	part.Parent = model
 	
@@ -255,6 +255,21 @@ local function createCrystalModel(crystal: LetterCrystal): Model
 	label.TextScaled = true
 	label.Text = crystal.Letter
 	label.Parent = billboard
+	
+	-- ═══ ProximityPrompt: lets players see "Press E to Collect" ═══
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ObjectText = crystal.Rarity .. " Crystal"
+	prompt.ActionText = "Collect " .. crystal.Letter
+	prompt.RequiresLineOfSight = false
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 10
+	prompt.KeyboardKeyCode = Enum.KeyCode.E
+	prompt.Parent = part
+	
+	-- Wire the prompt to collection
+	prompt.Triggered:Connect(function(player)
+		CrystalService:CollectCrystal(player, crystal.InstanceId)
+	end)
 	
 	-- Point light for glow
 	local light = Instance.new("PointLight")
@@ -404,12 +419,14 @@ function CrystalService:KnitStart()
 end
 
 function CrystalService:SpawnStarterCrystals()
-	local starterLetters = {"E", "A", "R", "T", "H", "I", "G", "N", "I", "S", "A", "Q", "U", "A"}
+	-- Guarantee letters for first words: CAT, DOG, RUN, BIG + extras
+	-- Placed close to spawn so a kid can build a word in under a minute
+	local starterLetters = {"C", "A", "T", "D", "O", "G", "R", "U", "N", "B", "I", "E", "S", "H"}
 	local center = Vector3.new(0, 5, 0)
 	
 	for i, letter in ipairs(starterLetters) do
 		local angle = (i / #starterLetters) * math.pi * 2
-		local radius = 20
+		local radius = 12 -- Close to spawn!
 		local pos = center + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
 		
 		local crystal: LetterCrystal = {
@@ -423,7 +440,7 @@ function CrystalService:SpawnStarterCrystals()
 		activeCrystalCount += 1
 		crystalModels[crystal.InstanceId] = createCrystalModel(crystal)
 	end
-	print("[CrystalService] Spawned starter crystals around spawn.")
+	print("[CrystalService] Spawned " .. #starterLetters .. " starter crystals near spawn (CAT, DOG, RUN, BIG).")
 end
 
 function CrystalService:SpawnCrystal()
@@ -520,7 +537,7 @@ function CrystalService:CanFormWord(player: Player, word: string): boolean
 	
 	local letters = {}
 	for i = 1, #word do
-		local letter = string.sub(word, i, i)
+		local letter = string.sub(word, i, i):upper()
 		letters[letter] = (letters[letter] or 0) + 1
 	end
 	
@@ -545,9 +562,9 @@ function CrystalService:UseLetters(player: Player, word: string): boolean
 	
 	local inventory = playerInventories[player]
 	
-	-- Remove letters used
+	-- Remove letters used (uppercase to match inventory keys)
 	for i = 1, #word do
-		local letter = string.sub(word, i, i)
+		local letter = string.sub(word, i, i):upper()
 		inventory[letter] = (inventory[letter] or 1) - 1
 	end
 	

@@ -205,6 +205,8 @@ local function generateBuildingInterior(cframe: CFrame, size: Vector3, buildingN
 	enterLabel.TextScaled = true
 	enterLabel.Parent = enterGui
 	
+	enterGui.Enabled = false -- Hidden for UI Simplification
+	
 	-- Add exit proximity prompts inside the building
 	local exitPrompt = Instance.new("ProximityPrompt")
 	exitPrompt.Name = "ExitBuilding"
@@ -238,10 +240,10 @@ local function generateBuildingInterior(cframe: CFrame, size: Vector3, buildingN
 	labelText.BackgroundTransparency = 1
 	labelText.Text = buildingName .. "\n(Inside)"
 	labelText.TextColor3 = palette.Accent
-	labelText.TextStrokeTransparency = 0
-	labelText.Font = Enum.Font.GothamBold
 	labelText.TextScaled = true
 	labelText.Parent = insideLabel
+	
+	insideLabel.Enabled = false -- Hidden for UI Simplification
 	
 	return interiorFolder
 end
@@ -475,35 +477,8 @@ local function generateBuilding(cframe: CFrame, size: Vector3, styleName: string
 		end
 	end
 
-	-- 5.5 Mycelial Node (Semantic Architecture)
-	local mycelialNode = Instance.new("Part")
-	mycelialNode.Name = "MycelialNode"
-	mycelialNode.Size = Vector3.new(3, 3, 3)
-	mycelialNode.CFrame = cframe * CFrame.new(-size.X/2 + 2, -size.Y/2 + 1.5, size.Z/2 + 1)
-	mycelialNode.Shape = Enum.PartType.Ball
-	mycelialNode.Anchored = true
-	mycelialNode.CanCollide = false
-	mycelialNode.Material = Enum.Material.Neon
-	mycelialNode.Color = Color3.fromRGB(150, 50, 200) -- Mycelium purple
-	mycelialNode.Parent = model
-	
-	local nodeLight = Instance.new("PointLight")
-	nodeLight.Color = mycelialNode.Color
-	nodeLight.Range = 10
-	nodeLight.Parent = mycelialNode
-	
-	local nodePrompt = Instance.new("ProximityPrompt")
-	nodePrompt.ActionText = "Feed Slime to Building"
-	nodePrompt.ObjectText = name .. " Mycelial Node"
-	nodePrompt.HoldDuration = 1
-	nodePrompt.KeyboardKeyCode = Enum.KeyCode.F
-	nodePrompt.Triggered:Connect(function(player)
-		local SemanticArchitectureService = Knit.GetService("SemanticArchitectureService")
-		if SemanticArchitectureService then
-			SemanticArchitectureService:PromptFeedBuilding(player, name)
-		end
-	end)
-	nodePrompt.Parent = mycelialNode
+	-- 5.5 Mycelial Node — disabled (SemanticArchitectureService is archived)
+	-- TODO: Re-enable when Semantic Architecture system is reintroduced
 
 	-- 6. Generate Interior
 	if districtName then
@@ -520,7 +495,7 @@ local function spawnDistrictFoliage(districtName: string, districtCenter: Vector
 	foliageFolder.Name = districtName .. "_Foliage"
 	foliageFolder.Parent = Workspace
 
-	local count = 40
+	local count = 12
 	local material = data.FloorMaterial or Enum.Material.Grass
 
 	for i = 1, count do
@@ -856,33 +831,8 @@ end
 -- Public API
 
 local function createHealthIndicator()
-    print("TownGenerator: Creating Server Health Indicator...")
-    local part = Instance.new("Part")
-    part.Name = "SERVER_HEALTH_INDICATOR"
-    part.Size = Vector3.new(4, 4, 4)
-    part.Position = Vector3.new(0, 50, 0) -- High up in the air
-    part.Anchored = true
-    part.CanCollide = false
-    part.Material = Enum.Material.Neon
-    part.Color = Color3.new(0, 1, 0) -- Green for OK
-    part.Parent = Workspace
-
-    local bGui = Instance.new("BillboardGui")
-    bGui.Size = UDim2.new(0, 200, 0, 50)
-    bGui.Adornee = part
-    bGui.AlwaysOnTop = true
-    bGui.Parent = part
-
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 1, 0)
-    label.BackgroundTransparency = 1
-    label.Text = "SERVER ACTIVE"
-    label.TextColor3 = Color3.new(1, 1, 1)
-    label.TextStrokeTransparency = 0
-    label.TextScaled = true
-    label.Parent = bGui
-    
-    print("TownGenerator: Health Indicator Created.")
+    -- Disabled: dev-only visual noise for players
+    print("TownGenerator: Health indicator disabled (dev-only)")
 end
 
 function TownGenerator:KnitStart()

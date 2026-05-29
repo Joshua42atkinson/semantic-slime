@@ -73,7 +73,6 @@ src/
 │   │   ├── AIService.lua        ← Gemini API for NPC dialogue
 │   │   └── ...
 │   └── Scripts/
-│       └── LightingManager.server.luau ← Legacy lighting script
 ├── client/
 │   ├── Boot.client.luau         ← Client entry point
 │   ├── Controllers/             ← 21 Knit controllers

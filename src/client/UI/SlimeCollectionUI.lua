@@ -525,11 +525,50 @@ function SlimeCollectionUI.SelectSlime(slime: any)
 		contextY = 0.92
 	end
 	
+	-- Evolve button
+	local evolveBtn = Instance.new("TextButton")
+	evolveBtn.Name = "EvolveBtn"
+	evolveBtn.Size = UDim2.fromScale(1, 0.08)
+	evolveBtn.Position = UDim2.fromScale(0, contextY)
+	evolveBtn.BackgroundColor3 = COLORS.Border
+	evolveBtn.TextColor3 = COLORS.Background
+	evolveBtn.Font = Enum.Font.GothamBold
+	evolveBtn.TextSize = 14
+	evolveBtn.Text = "🧬 Evolve"
+	evolveBtn.Parent = detailContent
+	
+	local evolveCorner = Instance.new("UICorner")
+	evolveCorner.CornerRadius = UDim.new(0, 8)
+	evolveCorner.Parent = evolveBtn
+	
+	evolveBtn.MouseButton1Click:Connect(function()
+		local SlimeFactory = Knit.GetService("SlimeFactory")
+		SlimeFactory:GetAvailableEvolutions(slime.InstanceId):andThen(function(evolutions)
+			if #evolutions > 0 then
+				local evo = evolutions[1] -- Just use first available for now
+				if slime.XP >= evo.xpCost then
+					SlimeFactory:EvolveSlime(slime.InstanceId, evo.type):andThen(function(newSlime)
+						if newSlime then
+							print("[SlimeCollectionUI] Evolved slime to " .. newSlime.Term)
+							SlimeCollectionUI.SelectSlime(newSlime)
+						end
+					end):catch(warn)
+				else
+					evolveBtn.Text = "Not enough XP (" .. slime.XP .. "/" .. evo.xpCost .. ")"
+					task.delay(2, function() evolveBtn.Text = "🧬 Evolve" end)
+				end
+			else
+				evolveBtn.Text = "No Evolutions Available"
+				task.delay(2, function() evolveBtn.Text = "🧬 Evolve" end)
+			end
+		end):catch(warn)
+	end)
+
 	-- Set as Companion button
 	local companionBtn = Instance.new("TextButton")
 	companionBtn.Name = "SetCompanionBtn"
 	companionBtn.Size = UDim2.fromScale(1, 0.08)
-	companionBtn.Position = UDim2.fromScale(0, contextY)
+	companionBtn.Position = UDim2.fromScale(0, contextY + 0.1)
 	companionBtn.BackgroundColor3 = COLORS.Accent
 	companionBtn.TextColor3 = COLORS.Text
 	companionBtn.Font = Enum.Font.GothamBold
@@ -571,7 +610,7 @@ function SlimeCollectionUI.Initialize()
 	-- Listen for new slimes
 	local SlimeFactory = Knit.GetService("SlimeFactory")
 	
-	SlimeFactory.Client.SlimeCreated:Connect(function(slime)
+	SlimeFactory.SlimeCreated:Connect(function(slime)
 		if isOpen and collectionScreen then
 			local gridContainer = collectionScreen:FindFirstChild("SlimeGrid", true)
 			if gridContainer then
