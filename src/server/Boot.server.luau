@@ -77,7 +77,7 @@ else
 end
 
 -- ================================================================
--- 4. Load all Knit services (pcall-protected)
+-- 4. Load all Knit services
 -- ================================================================
 CrashGuard.BootStage("Services", 5, 5)
 local ServicesFolder = ServerScriptService.Server.Services
@@ -87,13 +87,8 @@ local failedNames = {}
 
 for _, module in ipairs(ServicesFolder:GetChildren()) do
 	if module:IsA("ModuleScript") then
-		local ok, _ = CrashGuard.SafeRequire("Boot", module)
-		if ok then
-			loadedCount += 1
-		else
-			failedCount += 1
-			table.insert(failedNames, module.Name)
-		end
+		require(module)
+		loadedCount += 1
 	end
 end
 

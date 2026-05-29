@@ -24,7 +24,7 @@ local SOUNDS = {
 }
 
 -- Set to true to skip all sound loading (fixes crashes on Wine/unpublished places)
-local DISABLE_SOUNDS = true -- TODO: set to false once published to Roblox
+local DISABLE_SOUNDS = false -- Set to true if local testing causes crashes on unsupported OS
 
 function SoundController:KnitStart()
     self.Sounds = {}

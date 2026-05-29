@@ -722,12 +722,47 @@ local function calculateAggregatedStats(components: { [number]: { InstanceId: st
 	local aggregated = { Logos = 0, Pathos = 0, Ethos = 0, Speed = 0 }
 	
 	for _, component in ipairs(components) do
-		-- This would normally look up the component's stats from playerSlimes
-		-- For now, we use a baseline calculation
-		aggregated.Logos = aggregated.Logos + 20
-		aggregated.Pathos = aggregated.Pathos + 15
-		aggregated.Ethos = aggregated.Ethos + 15
-		aggregated.Speed = aggregated.Speed + 10
+		local word = component.Word:lower()
+		local length = #word
+		local vowels = 0
+		local consonants = 0
+		
+		for i = 1, length do
+			local c = word:sub(i, i)
+			if c == "a" or c == "e" or c == "i" or c == "o" or c == "u" then
+				vowels += 1
+			elseif c:match("%a") then
+				consonants += 1
+			end
+		end
+		
+		-- Dynamic stats generation
+		local wordLogos = 10 + (length * 2) + (consonants * 3)
+		local wordPathos = 10 + (vowels * 5)
+		local wordEthos = 10 + (consonants * 2) + (vowels * 2)
+		local wordSpeed = 10 + (length > 5 and 5 or 15) -- Shorter words are faster
+		
+		-- Grade level bonus
+		local wordData = WordDatabase[word]
+		if wordData and wordData.GradeLevel then
+			local gradeBonus = {
+				["K-2"] = 1.0,
+				["3-5"] = 1.2,
+				["6-9"] = 1.5,
+				["10-12"] = 1.8,
+				["Graduate"] = 2.0,
+			}
+			local mult = gradeBonus[wordData.GradeLevel] or 1.0
+			wordLogos = math.floor(wordLogos * mult)
+			wordPathos = math.floor(wordPathos * mult)
+			wordEthos = math.floor(wordEthos * mult)
+			wordSpeed = math.floor(wordSpeed * mult)
+		end
+		
+		aggregated.Logos += wordLogos
+		aggregated.Pathos += wordPathos
+		aggregated.Ethos += wordEthos
+		aggregated.Speed += wordSpeed
 	end
 	
 	-- Apply sacrifice bonus: +50% stats per sacrifice

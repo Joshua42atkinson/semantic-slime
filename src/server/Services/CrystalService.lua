@@ -642,4 +642,32 @@ function CrystalService:GrantBonusLetters(player: Player, amount: number)
 	print("[CrystalService] Granted " .. amount .. " bonus letters to " .. player.Name)
 end
 
+function CrystalService:AddSpecificLetter(player: Player, letter: string)
+	if not playerInventories[player] then
+		playerInventories[player] = {}
+	end
+	
+	local upperLetter = string.upper(letter)
+	playerInventories[player][upperLetter] = (playerInventories[player][upperLetter] or 0) + 1
+	print("[CrystalService] Added specific letter " .. upperLetter .. " to " .. player.Name)
+end
+
+function CrystalService:RemoveRandomLetter(player: Player): string?
+	if not playerInventories[player] then return nil end
+	
+	local availableLetters = {}
+	for letter, count in pairs(playerInventories[player]) do
+		if count > 0 then
+			table.insert(availableLetters, letter)
+		end
+	end
+	
+	if #availableLetters == 0 then return nil end
+	
+	local randomLetter = availableLetters[math.random(1, #availableLetters)]
+	playerInventories[player][randomLetter] = playerInventories[player][randomLetter] - 1
+	print("[CrystalService] Removed random letter " .. randomLetter .. " from " .. player.Name)
+	return randomLetter
+end
+
 return CrystalService

@@ -57,18 +57,18 @@ function HUDController:KnitStart()
 	}
 	
 	for _, uiModule in ipairs(uiModules) do
-		success, result = pcall(function()
-			if uiModule.module and uiModule.module.Initialize then
-				uiModule.module.Initialize()
-				print("[HUDController] Initialized", uiModule.name)
-			else
-				print("[HUDController] Skipping", uiModule.name, "- no Initialize method")
-			end
-		end)
-		
-		if not success then
-			warn("[HUDController] Failed to initialize", uiModule.name, ":", result)
+		if not uiModule.module then
+			warn("[HUDController] Fatal: UI module " .. uiModule.name .. " is missing or failed to require.")
+			continue
 		end
+		
+		if type(uiModule.module.Initialize) ~= "function" then
+			warn("[HUDController] Fatal: UI module " .. uiModule.name .. " is missing the Initialize() method!")
+			continue
+		end
+		
+		uiModule.module.Initialize()
+		print("[HUDController] Initialized", uiModule.name)
 	end
 	
 	-- Start contextual hint system (replaces disabled tutorial)

@@ -386,23 +386,23 @@ local function setPhase(newPhase: GamePhase)
 	-- ═══ Phase-specific triggers ═══
 	-- Cleanup leaving Nuisance phase
 	if oldPhase == "Nuisance" and LetterNuisanceService then
-		pcall(function() LetterNuisanceService:EndNuisancePhase() end)
+		LetterNuisanceService:EndNuisancePhase()
 	end
 
 	-- Trigger entering phase mechanics
 	if newPhase == "Collection" and CrystalService then
 		-- Respawn crystals each cycle
-		pcall(function() CrystalService:SpawnCrystals() end)
+		for i = 1, 5 do
+			CrystalService:SpawnCrystal()
+		end
 	elseif newPhase == "Nuisance" and LetterNuisanceService then
 		-- Spawn clingy letters that chase players
-		pcall(function() LetterNuisanceService:SpawnNuisanceLetters(20) end)
+		LetterNuisanceService:SpawnNuisanceLetters(20)
 	elseif newPhase == "Rewards" and DataService then
 		-- Grant base phase-completion rewards to all players
 		for _, player in ipairs(Players:GetPlayers()) do
-			pcall(function()
-				DataService:AddXP(player, 25)
-				DataService:AddInsight(player, 5)
-			end)
+			DataService:AddXP(player, 25)
+			DataService:AddInsight(player, 5)
 		end
 	end
 end
