@@ -144,8 +144,10 @@ function LetterNuisanceService:DespawnNuisance(id: string, captured: boolean)
 		nuisance.Model:Destroy()
 	end
 	
+	local targetPlayerId = nuisance.TargetPlayer and tostring(nuisance.TargetPlayer.UserId) or ""
+	
 	activeNuisances[id] = nil
-	self.Client.NuisanceDespawned:FireAll(id, captured)
+	self.Client.NuisanceDespawned:FireAll(id, captured, targetPlayerId)
 end
 
 function LetterNuisanceService:HandlePlayerCollision(player: Player, nuisance: FeralLetter)

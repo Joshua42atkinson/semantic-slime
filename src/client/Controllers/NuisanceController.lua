@@ -45,9 +45,9 @@ function NuisanceController:KnitStart()
 			end
 		end)
 		
-		LetterNuisanceService.NuisanceDespawned:Connect(function(playerId: string, captured: boolean)
-			-- If not captured, maybe play a sad sound or screen shake if it was local player
-			if not captured and playerId == tostring(Players.LocalPlayer.UserId) then
+		LetterNuisanceService.NuisanceDespawned:Connect(function(nuisanceId: string, captured: boolean, targetPlayerId: string?)
+			-- If not captured, play hit effects if it was local player (directly notified or matched)
+			if not captured and (targetPlayerId == tostring(Players.LocalPlayer.UserId) or not targetPlayerId) then
 				local SoundController = Knit.GetController("SoundController")
 				if SoundController then
 					SoundController:Play("Error")
