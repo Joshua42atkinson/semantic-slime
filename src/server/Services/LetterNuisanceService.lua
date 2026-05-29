@@ -161,17 +161,18 @@ function LetterNuisanceService:HandlePlayerCollision(player: Player, nuisance: F
 		return
 	end
 	
-	-- For now, just a small penalty (e.g., steal a letter or push back)
+	-- Apply inventory penalty (steal a random letter)
 	local CrystalService = Knit.GetService("CrystalService")
 	if CrystalService then
 		local stolenLetter = CrystalService:RemoveRandomLetter(player)
 		if stolenLetter then
-			print("[LetterNuisanceService] Feral letter stole " .. stolenLetter .. " from " .. player.Name)
+			print("[LetterNuisanceService] Feral letter stole " .. tostring(stolenLetter) .. " from " .. player.Name)
+			-- Fire to client to trigger hit UI effect and audio cue
+			self.Client.NuisanceDespawned:Fire(player, id, false)
 		end
-		self.Client.NuisanceDespawned:Fire(player, id, false) -- Tell client they got hit
 	end
 	
-	-- Despawn it
+	-- Despawn the nuisance part
 	self:DespawnNuisance(id, false)
 end
 
@@ -179,7 +180,7 @@ function LetterNuisanceService:CaptureNuisance(player: Player, id: string)
 	local nuisance = activeNuisances[id]
 	if not nuisance then return end
 	
-	-- Add to inventory
+	-- Add captured letter to player's crystal inventory
 	local CrystalService = Knit.GetService("CrystalService")
 	if CrystalService then
 		CrystalService:AddSpecificLetter(player, nuisance.Letter)
@@ -187,6 +188,8 @@ function LetterNuisanceService:CaptureNuisance(player: Player, id: string)
 	
 	print("[LetterNuisanceService] " .. player.Name .. " captured feral " .. nuisance.Letter)
 	self:DespawnNuisance(id, true)
+	
+	-- Notify client to trigger capture effects
 	self.Client.NuisanceCaptured:Fire(player, nuisance.Letter)
 end
 
