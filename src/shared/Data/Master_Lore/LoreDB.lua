@@ -1,3 +1,4 @@
+--!strict
 -- src/shared/Data/Master_Lore/LoreDB.lua
 -- The single source of truth for NPC data and Quests in Syllable Springs
 -- Maps directly from the Lore Trinity documentation

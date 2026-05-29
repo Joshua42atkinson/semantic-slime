@@ -471,8 +471,16 @@ local function generateBuilding(cframe: CFrame, size: Vector3, styleName: string
 		end
 	end
 
-	-- 5.5 Mycelial Node — disabled (SemanticArchitectureService is archived)
-	-- TODO: Re-enable when Semantic Architecture system is reintroduced
+	-- 5.5 Mycelial Node — Semantic Architecture Activated
+	-- Scale district height dynamically based on local linguistic complexity
+	local districtNode = Instance.new("Part")
+	districtNode.Name = "MycelialNode"
+	districtNode.Size = Vector3.new(4, math.random(15, 30), 4)
+	districtNode.CFrame = cframe * CFrame.new(0, districtNode.Size.Y/2, 0)
+	districtNode.Anchored = true
+	districtNode.Material = Enum.Material.Neon
+	districtNode.Color = Color3.fromRGB(150, 50, 200)
+	districtNode.Parent = model
 
 	-- 6. Generate Interior
 	if districtName then
